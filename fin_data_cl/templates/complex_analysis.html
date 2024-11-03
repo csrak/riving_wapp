@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block title %}Screener for Financial Ratios{% endblock %}
+
+{% block content %}
+    <h2>Screener for Financial Ratios</h2>
+    
+    <!-- Filter form section -->
+    <form id="filter-form" class="mb-4">
+        <div class="row">
+            <div class="col-md-12">
+                <label class="form-label">Filters</label>
+                <div id="filters">
+                    <!-- Filter inputs will be added dynamically by JavaScript -->
+                </div>
+                <button type="button" id="add_filter" class="btn btn-secondary mt-2">Add Filter</button>
+            </div>
+        </div>
+        <button type="button" id="apply_filter" class="btn btn-primary mt-3">Apply Filter</button>
+    </form>
+
+    <!-- Table displaying financial ratios -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <!-- Column headers with sorting functionality -->
+                <th class="sortable" data-ratio="ticker">Ticker</th>
+                <th class="sortable" data-ratio="date">Date</th>
+                <th class="sortable" data-ratio="pe_ratio">P/E Ratio</th>
+                <th class="sortable" data-ratio="pb_ratio">P/B Ratio</th>
+                <th class="sortable" data-ratio="ps_ratio">P/S Ratio</th>
+                <th class="sortable" data-ratio="peg_ratio">PEG Ratio</th>
+                <th class="sortable" data-ratio="ev_ebitda">EV/EBITDA</th>
+                <th class="sortable" data-ratio="gross_profit_margin">Gross Profit Margin</th>
+                <th class="sortable" data-ratio="operating_profit_margin">Operating Profit Margin</th>
+                <th class="sortable" data-ratio="net_profit_margin">Net Profit Margin</th>
+                <th class="sortable" data-ratio="return_on_assets">ROA</th>
+                <th class="sortable" data-ratio="return_on_equity">ROE</th>
+                <th class="sortable" data-ratio="debt_to_equity">Debt-to-Equity</th>
+                <th class="sortable" data-ratio="current_ratio">Current Ratio</th>
+                <th class="sortable" data-ratio="quick_ratio">Quick Ratio</th>
+                <th class="sortable" data-ratio="dividend_yield">Dividend Yield</th>
+                <th class="sortable" data-ratio="before_dividend_yield">Last Div Yield</th>
+            </tr>
+        </thead>
+        <tbody id="ratio_table_body">
+            <!-- Table rows will be dynamically populated by JavaScript -->
+        </tbody>
+    </table>
+
+    <!-- JavaScript code to handle filtering, sorting, and data fetching -->
+    <script>
+        $(document).ready(function() {
+            let filterCount = 0;
+            let originalData = [];  // Initialize an empty array to store the original data
+
+            // Function to add a new filter input dynamically
+            function addFilter() {
+                filterCount++;
+                $('#filters').append(`
+                    <div class="filter-group mb-2 d-flex align-items-center" id="filter-group-${filterCount}" style="gap: 10px;">
+                        <select class="form-select ratio-name" id="ratio-name-${filterCount}" style="width: 150px;">
+                            <!-- Options for different financial ratios -->
+                            <option value="pe_ratio">P/E Ratio</option>
+                            <option value="pb_ratio">P/B Ratio</option>
+                            <option value="ps_ratio">P/S Ratio</option>
+                            <option value="peg_ratio">PEG Ratio</option>
+                            <option value="ev_ebitda">EV/EBITDA</option>
+                            <option value="gross_profit_margin">Gross Profit Margin</option>
+                            <option value="operating_profit_margin">Operating Profit Margin</option>
+                            <option value="net_profit_margin">Net Profit Margin</option>
+                            <option value="return_on_assets">ROA</option>
+                            <option value="return_on_equity">ROE</option>
+                            <option value="debt_to_equity">Debt-to-Equity</option>
+                            <option value="current_ratio">Current Ratio</option>
+                            <option value="quick_ratio">Quick Ratio</option>
+                            <option value="dividend_yield">Dividend Yield</option>
+                            <option value="before_dividend_yield">Last Div Yield</option>
+                        </select>
+                        <select class="form-select filter-operator" style="width: 120px;">
+                            <!-- Options for filter operators -->
+                            <option value="gt">Greater Than</option>
+                            <option value="lt">Less Than</option>
+                            <option value="gte">Greater Than or Equal To</option>
+                            <option value="lte">Less Than or Equal To</option>
+                        </select>
+                        <input type="number" step="any" class="form-control filter-value" placeholder="Value" style="width: 100px;">
+                        <button type="button" class="btn btn-danger remove-filter" data-filter-id="${filterCount}">Remove</button>
+                    </div>
+                `);
+            }
+
+            // Add the first filter input when the page loads
+            addFilter();
+
+            // Handle adding new filters
+            $('#add_filter').on('click', function() {
+                addFilter();
+            });
+
+            // Handle removing filters
+            $(document).on('click', '.remove-filter', function() {
+                const filterId = $(this).data('filter-id');
+                $(`#filter-group-${filterId}`).remove();
+            });
+
+            // Apply filters and fetch data from the server
+            $('#apply_filter').on('click', function() {
+                const filters = [];
+
+                // Collect all active filters
+                $('.filter-group').each(function() {
+                    const ratio = $(this).find('.ratio-name').val();
+                    const operator = $(this).find('.filter-operator').val();
+                    const value = $(this).find('.filter-value').val();
+                    filters.push(`${ratio}:${operator}:${value}`);
+                });
+
+                // Debug: Log the filters to the console
+                console.log('Filters:', filters);
+
+                // AJAX request to fetch filtered data
+                $.ajax({
+                    url: '{% url "filter_ratios" %}',  // Django URL for filtering data
+                    data: {
+                        'filters[]': filters,  // Send filters as query parameters
+                    },
+                    success: function(data) {
+                        originalData = data;  // Store the fetched data for sorting
+                        renderTable(data);  // Render the table with the fetched data
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error fetching data:", error);
+                    }
+                });
+            });
+
+            // Function to render the table with provided data
+            function renderTable(data) {
+                const tbody = $('#ratio_table_body');
+                tbody.empty();  // Clear the current table body
+
+                if (data.length === 0) {
+                    // If no data, show a message
+                    tbody.append('<tr><td colspan="15">No data available for the applied filters.</td></tr>');
+                } else {
+                    // Populate the table body with the data
+                    data.forEach(function(ratio) {
+                        let row = `<tr><td>${ratio.ticker}</td><td>${ratio.date}</td>`;
+                        row += `<td>${ratio.pe_ratio !== undefined ? parseFloat(ratio.pe_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.pb_ratio !== undefined ? parseFloat(ratio.pb_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.ps_ratio !== undefined ? parseFloat(ratio.ps_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.peg_ratio !== undefined ? parseFloat(ratio.peg_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.ev_ebitda !== undefined ? parseFloat(ratio.ev_ebitda).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.gross_profit_margin !== undefined ? parseFloat(ratio.gross_profit_margin).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.operating_profit_margin !== undefined ? parseFloat(ratio.operating_profit_margin).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.net_profit_margin !== undefined ? parseFloat(ratio.net_profit_margin).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.return_on_assets !== undefined ? parseFloat(ratio.return_on_assets).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.return_on_equity !== undefined ? parseFloat(ratio.return_on_equity).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.debt_to_equity !== undefined ? parseFloat(ratio.debt_to_equity).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.current_ratio !== undefined ? parseFloat(ratio.current_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.quick_ratio !== undefined ? parseFloat(ratio.quick_ratio).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.dividend_yield !== undefined ? parseFloat(ratio.dividend_yield).toFixed(2) : 'N/A'}</td>`;
+                        row += `<td>${ratio.before_dividend_yield !== undefined ? parseFloat(ratio.before_dividend_yield).toFixed(2) : 'N/A'}</td>`;
+                        row += `</tr>`;
+                        tbody.append(row);  // Append the row to the table body
+                    });
+                }
+            }
+
+            // Function to enable sorting on the table columns with visual indicators
+            function enableSorting() {
+                let sortedColumn = null;  // Track which column is currently sorted
+                let sortOrder = 'asc';  // Default sort order
+
+                // Event handler for clicking on sortable headers
+                $('.sortable').off('click').on('click', function() {
+                    const ratio = $(this).data('ratio');
+
+                    // Toggle sort order if the same column is clicked
+                    if (sortedColumn === ratio) {
+                        sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortedColumn = ratio;
+                        sortOrder = 'asc';  // Reset to ascending if a new column is clicked
+                    }
+
+                    // Remove sorting indicators from all headers
+                    $('.sortable').removeClass('sort-asc sort-desc');
+
+                    // Add sorting indicator to the currently sorted column
+                    if (sortOrder === 'asc') {
+                        $(this).addClass('sort-asc');
+                    } else {
+                        $(this).addClass('sort-desc');
+                    }
+
+                    // Sort the data
+                    const sortedData = [...originalData].sort((a, b) => {
+                        const A = a[ratio] !== undefined && !isNaN(a[ratio]) ? parseFloat(a[ratio]) : a[ratio];
+                        const B = b[ratio] !== undefined && !isNaN(b[ratio]) ? parseFloat(b[ratio]) : b[ratio];
+
+                        if (typeof A === 'string' && typeof B === 'string') {
+                            return sortOrder === 'asc' ? A.localeCompare(B) : B.localeCompare(A);
+                        } else {
+                            return sortOrder === 'asc' ? A - B : B - A;
+                        }
+                    });
+
+                    // Re-render the table with the sorted data
+                    renderTable(sortedData);
+                });
+            }
+
+            // Initialize sorting functionality when the page loads
+            enableSorting();
+        });
+    </script>
+
+    <!-- Add the following CSS to style the sorting indicators -->
+    <style>
+        .sortable {
+            cursor: pointer;
+        }
+        .sortable.sort-asc::after {
+            content: '▲';  /* Up arrow for ascending sort */
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+        .sortable.sort-desc::after {
+            content: '▼';  /* Down arrow for descending sort */
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+    </style>
+
+{% endblock %}
