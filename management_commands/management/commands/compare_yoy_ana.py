@@ -77,9 +77,6 @@ class RiskComparison(BaseModel):
     removed_risks: list[Risks]
     modified_risks: list[Risks]
 
-
-
-
 class ReportAnalyzer:
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -145,7 +142,6 @@ class ReportAnalyzer:
         {"role":"user", "content":comparison_prompt}  ], response_format=RiskComparison)
         print(completion.choices[0].message.parsed)
         #print(dir(response))
-        exit()
         return completion.choices[0].message.parsed
 
 
@@ -166,17 +162,24 @@ class Command(BaseCommand):
             help='Directory to store analysis results'
         )
 
-    def write_results(self, output_dir: Path, ticker: str, period1: str, period2: str, results: Dict):
+    def write_results(self, output_dir: Path, ticker: str, period1: str, period2: str, results: str):
         """Write analysis results to a file."""
         try:
             output_dir = Path(output_dir)
             output_dir.mkdir(exist_ok=True)
-            filename = f"{ticker}_{period1}_to_{period2}_analysis.json"
+            filename = f"{ticker}_{period1}_to_{period2}_analysis.txt"
             output_file = output_dir / filename
 
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
-
+                f.write("New Risks:\n")
+                for l in results.new_risks:
+                    f.write(l.name+ ": " + l.description +'\n')
+                f.write("Removed Risks:\n")
+                for l in results.removed_risks:
+                    f.write(l.name+ ": " + l.description +'\n')
+                f.write("Modified Risks:\n")
+                for l in results.modified_risks:
+                    f.write(l.name+ ": " + l.description +'\n')
             return output_file
         except Exception as e:
             logger.error(f"Error writing results: {e}")
@@ -249,6 +252,8 @@ class Command(BaseCommand):
                         f"{period1.name} -> {period2.name}\n"
                         f"Results written to: {output_file}"
                     ))
+
+
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Error in handle: {e}"))

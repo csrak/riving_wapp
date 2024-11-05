@@ -1,5 +1,16 @@
 from django.db import models
 from decimal import Decimal
+
+class RiskComparison(models.Model):
+    ticker = models.CharField(max_length=20)
+    year = models.PositiveIntegerField()
+    month = models.PositiveIntegerField()
+
+    new_risks = models.TextField()
+    old_risks = models.JSONField()  # Changed to django.db.models.JSONField
+    modified_risks = models.JSONField()  # Changed to django.db.models.JSONField
+    def __str__(self):
+        return f"Financial Report for {self.ticker} ({self.month}-{self.year})"
 class FinancialReport(models.Model):
     ticker = models.CharField(max_length=20)
     year = models.PositiveIntegerField()
