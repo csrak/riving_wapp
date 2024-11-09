@@ -9,7 +9,7 @@ from llama_index.core import Document, Settings, SimpleDirectoryReader, VectorSt
 from openai import OpenAI as OpenAIog
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
-
+from fin_data_cl.models import RiskComparison
 import logging
 import time
 from pydantic import BaseModel, Field
@@ -245,7 +245,15 @@ class Command(BaseCommand):
                     period2.name,
                     comparison
                 )
-
+                #We'll use period 2 as reference
+                financial_report, created = RiskComparison.objects.get_or_create(ticker=ticker,
+                    year=datetime.strptime(period2.name, '%m-%Y').year,
+                    month=datetime.strptime(period2.name, '%m-%Y').month,
+                    defaults={
+                        'new_risks': comparison.new_risks,
+                        'old_risks': comparison.removed_risks,
+                        'modified_risks': comparison.modifed_risks
+                })
                 if output_file:
                     self.stdout.write(self.style.SUCCESS(
                         f"Successfully analyzed {ticker} for periods "
