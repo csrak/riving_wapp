@@ -1,47 +1,47 @@
 from django.http import JsonResponse
 from django.shortcuts import render
-from .models import FinancialData, FinancialRatio, PriceData, FinancialReport
+from .models import FinancialData, FinancialRatio, PriceData, FinancialReport, RiskComparison
 from django.db.models import Q, Subquery, OuterRef, DecimalField, F
 from django.db.models.functions import Cast
-from .forms import FinancialReportSearchForm
+from .forms import FinancialReportSearchForm, FinancialRisksSearchForm
 
 def search_financial_risks(request):
     report_left = None
     report_right = None
-    form_left = FinancialReportSearchForm(prefix='left')
-    form_right = FinancialReportSearchForm(prefix='right')
+    form_left = FinancialRisksSearchForm(prefix='left')
+    form_right = FinancialRisksSearchForm(prefix='right')
 
     if request.method == 'POST':
         form_id = request.POST.get('form_id')
 
         if form_id == 'left':
-            form_left = FinancialReportSearchForm(request.POST, prefix='left')
+            form_left = FinancialRisksSearchForm(request.POST, prefix='left')
             if form_left.is_valid():
                 ticker = form_left.cleaned_data['ticker']
                 year = form_left.cleaned_data['year']
                 month = form_left.cleaned_data['month']
                 try:
-                    report_left = FinancialReport.objects.get(
+                    report_left = RiskComparison.objects.get(
                         ticker=ticker,
                         year=year,
                         month=month
                     )
-                except FinancialReport.DoesNotExist:
+                except RiskComparison.DoesNotExist:
                     report_left = None
 
         elif form_id == 'right':
-            form_right = FinancialReportSearchForm(request.POST, prefix='right')
+            form_right = FinancialRisksSearchForm(request.POST, prefix='right')
             if form_right.is_valid():
                 ticker = form_right.cleaned_data['ticker']
                 year = form_right.cleaned_data['year']
                 month = form_right.cleaned_data['month']
                 try:
-                    report_right = FinancialReport.objects.get(
+                    report_right = RiskComparison.objects.get(
                         ticker=ticker,
                         year=year,
                         month=month
                     )
-                except FinancialReport.DoesNotExist:
+                except RiskComparison.DoesNotExist:
                     report_right = None
 
         # Reinitialize the other form if it wasn't submitted
@@ -52,14 +52,14 @@ def search_financial_risks(request):
                     'year': request.session['right-year'],
                     'month': request.session['right-month']
                 }
-                form_right = FinancialReportSearchForm(initial=initial_right, prefix='right')
+                form_right = FinancialRisksSearchForm(initial=initial_right, prefix='right')
                 try:
-                    report_right = FinancialReport.objects.get(
+                    report_right = RiskComparison.objects.get(
                         ticker=initial_right['ticker'],
                         year=initial_right['year'],
                         month=initial_right['month']
                     )
-                except FinancialReport.DoesNotExist:
+                except RiskComparison.DoesNotExist:
                     report_right = None
         else:
             if 'left-ticker' in request.session:
@@ -68,14 +68,14 @@ def search_financial_risks(request):
                     'year': request.session['left-year'],
                     'month': request.session['left-month']
                 }
-                form_left = FinancialReportSearchForm(initial=initial_left, prefix='left')
+                form_left = FinancialRisksSearchForm(initial=initial_left, prefix='left')
                 try:
-                    report_left = FinancialReport.objects.get(
+                    report_left = RiskComparison.objects.get(
                         ticker=initial_left['ticker'],
                         year=initial_left['year'],
                         month=initial_left['month']
                     )
-                except FinancialReport.DoesNotExist:
+                except RiskComparison.DoesNotExist:
                     report_left = None
 
         # Store the current values in session

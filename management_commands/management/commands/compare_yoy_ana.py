@@ -246,14 +246,16 @@ class Command(BaseCommand):
                     comparison
                 )
                 #We'll use period 2 as reference
-                financial_report, created = Model_Risk.objects.get_or_create(ticker=ticker,
-                    year=datetime.strptime(period2.name, '%m-%Y').year,
-                    month=datetime.strptime(period2.name, '%m-%Y').month,
+                financial_risk, created = Model_Risk.objects.get_or_create(
+                    ticker=ticker,
+                    year=int(datetime.strptime(period2.name, '%m-%Y').year),
+                    month=int(datetime.strptime(period2.name, '%m-%Y').month),
                     defaults={
                         'new_risks': [i.name + "\n" + i.description for i in comparison.new_risks],
                         'old_risks': [i.name + "\n" + i.description for i in comparison.removed_risks],
                         'modified_risks': [i.name + "\n" + i.description for i in comparison.modified_risks]
                 })
+                financial_risk.save()
                 if output_file:
                     self.stdout.write(self.style.SUCCESS(
                         f"Successfully analyzed {ticker} for periods "

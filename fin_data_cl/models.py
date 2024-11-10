@@ -6,21 +6,21 @@ class RiskComparison(models.Model):
     year = models.PositiveIntegerField()
     month = models.PositiveIntegerField()
 
-    new_risks = models.TextField()
-    old_risks = models.JSONField()  # Changed to django.db.models.JSONField
-    modified_risks = models.JSONField()  # Changed to django.db.models.JSONField
+    new_risks = models.JSONField(blank=True, null=True)
+    old_risks = models.JSONField(blank=True, null=True)
+    modified_risks = models.JSONField(blank=True, null=True)
     def __str__(self):
-        return f"Financial Report for {self.ticker} ({self.month}-{self.year})"
+        return f"Financial Risks for {self.ticker} ({self.month}-{self.year})"
 class FinancialReport(models.Model):
     ticker = models.CharField(max_length=20)
     year = models.PositiveIntegerField()
     month = models.PositiveIntegerField()
 
     business_overview = models.TextField()
-    risks = models.JSONField()  # Changed to django.db.models.JSONField
-    metrics = models.JSONField()  # Changed to django.db.models.JSONField
-    historical_changes = models.JSONField()  # Changed to django.db.models.JSONField
-    future_outlook = models.JSONField()  # Changed to django.db.models.JSONField
+    risks = models.JSONField()
+    metrics = models.JSONField()
+    historical_changes = models.JSONField()
+    future_outlook = models.JSONField()
 
     def __str__(self):
         return f"Financial Report for {self.ticker} ({self.month}-{self.year})"
@@ -84,8 +84,6 @@ class FinancialData(TickerData):
         unique_together = ('ticker', 'date')
         verbose_name = 'Financial Data'
         verbose_name_plural = 'Financial Data'
-
-from django.db import models
 
 class PriceData(models.Model):
     ticker = models.CharField(max_length=10)

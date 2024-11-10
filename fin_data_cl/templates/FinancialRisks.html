@@ -5,7 +5,7 @@
     <div class="row">
         <!-- Left Side -->
         <div class="col-md-6 px-4">
-            <h1 class="mb-4">Search Financial Report #1</h1>
+            <h1 class="mb-4">Search Financial Risks #1</h1>
 
             <form method="post" class="mb-4">
                 {% csrf_token %}
@@ -37,7 +37,9 @@
                         </h2>
                         <div id="collapseOverviewLeft" class="accordion-collapse collapse show" aria-labelledby="headingOverviewLeft" data-bs-parent="#financialReportAccordionLeft">
                             <div class="accordion-body">
-                                <p>{{ report_left.new_risks }}</p>
+                                {% for risk in report_left.new_risks %}
+                                    <p>{{ risk }}</p>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
@@ -52,8 +54,8 @@
                         <div id="collapseRisksLeft" class="accordion-collapse collapse" aria-labelledby="headingRisksLeft" data-bs-parent="#financialReportAccordionLeft">
                             <div class="accordion-body">
                                 {% for risk in report_left.old_risks %}
-                                    {% if risk.description|wordcount >= 5 %}
-                                        <p><strong>Description:</strong> {{ risk }}</p>
+                                    {% if risk|wordcount >= 5 %}
+                                        <p> {{ risk }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -71,7 +73,7 @@
                         <div id="collapseChangesLeft" class="accordion-collapse collapse" aria-labelledby="headingChangesLeft" data-bs-parent="#financialReportAccordionLeft">
                             <div class="accordion-body">
                                 {% for change in report_left.modified_risks %}
-                                    {% if change.description|wordcount >= 5 %}
+                                    {% if change|wordcount >= 5 %}
                                         <p><strong>Description:</strong> {{ change }}</p>
                                         <hr>
                                     {% endif %}
