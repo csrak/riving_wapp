@@ -13,7 +13,9 @@ from fin_data_cl.models import RiskComparison as Model_Risk
 import logging
 import time
 from pydantic import BaseModel, Field
+from collections import defaultdict
 import openai
+from dateutil.relativedelta import relativedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,82 @@ class ReportLocator:
     def __init__(self, data_folder: Path):
         self.data_folder = data_folder
 
+    def get_consecutive_quarter_pairs(self) -> List[Tuple[Path, Path]]:
+        """
+        Get pairs of consecutive quarter folders from oldest to newest.
+        Warns and stops if a quarter is missing.
+
+        Returns:
+            List[Tuple[Path, Path]]: List of folder pairs up to the first missing quarter
+        """
+        folders = self.get_period_folders()
+        if len(folders) < 2:
+            return []
+
+        folder_pairs = []
+        for i in range(len(folders) - 1):
+            current_folder = folders[i]
+            next_folder = folders[i + 1]
+
+            # Parse dates
+            current_date = datetime.strptime(current_folder.name, "%m-%Y")
+            next_date = datetime.strptime(next_folder.name, "%m-%Y")
+
+            # Calculate expected next quarter
+            expected_next = current_date + relativedelta(months=3)
+            expected_next_str = expected_next.strftime("%m-%Y")
+
+            # Check if the next folder is the expected one
+            if next_date != expected_next:
+                print(f"\nAnalysis stopped: No folder found for {expected_next_str}")
+                print(f"Last processed quarter: {current_folder.name}")
+                return folder_pairs
+
+            folder_pairs.append((current_folder, next_folder))
+
+        return folder_pairs
+
+    def process_quarters(self, callback=None):
+        """
+        Process all quarters in sequence, handling missing folders.
+
+        Args:
+            callback: Optional function to process each pair of folders
+                     Should accept (earlier_folder, next_folder) as parameters
+        """
+        folders = self.get_period_folders()
+        if not folders:
+            print("No quarterly folders found.")
+            return
+
+        current_folder = folders[0]
+        print(f"Starting analysis from oldest quarter: {current_folder.name}")
+
+        while True:
+            # Calculate expected next quarter
+            current_date = datetime.strptime(current_folder.name, "%m-%Y")
+            expected_next = current_date + relativedelta(months=3)
+            expected_next_str = expected_next.strftime("%m-%Y")
+
+            # Find the next folder
+            next_folder = None
+            for folder in folders:
+                if folder.name == expected_next_str:
+                    next_folder = folder
+                    break
+
+            if next_folder is None:
+                print(f"\nAnalysis stopped: No folder found for {expected_next_str}")
+                print(f"Last processed quarter: {current_folder.name}")
+                break
+
+            print(f"Processing: {current_folder.name} -> {next_folder.name}")
+
+            # Execute callback if provided
+            if callback:
+                callback(current_folder, next_folder)
+
+            current_folder = next_folder
     def get_period_folders(self) -> List[Path]:
         """Get all valid period folders sorted by date."""
         pattern = re.compile(r"^(03|06|09|12)-\d{4}$")
@@ -63,6 +141,53 @@ class ReportLocator:
 
         oldest_year = datetime.strptime(all_folders[0].name, "%m-%Y").year
         return [f for f in all_folders if datetime.strptime(f.name, "%m-%Y").year == oldest_year]
+
+
+    def get_tickers_in_period(self, period_folder: Path) -> List[str]:
+        """
+        Get all tickers found in a specific period folder.
+
+        Args:
+            period_folder (Path): Path to the period folder
+
+        Returns:
+            List[str]: List of tickers found in the period
+        """
+        pattern = re.compile(r"Analisis_([A-Z]+)_\d{2}-\d{4}\.pdf")
+        tickers = []
+
+        for file in period_folder.glob("*.pdf"):
+            if match := pattern.match(file.name):
+                tickers.append(match.group(1))
+
+        return sorted(tickers)
+
+
+    def get_ticker_paths_by_period(self) -> Dict[str, List[Path]]:
+        """
+        Get all existing paths for each ticker, ordered from oldest to newest.
+
+        Returns:
+            Dict[str, List[Path]]: Dictionary where keys are tickers and values are lists of paths
+                                 ordered from oldest to newest
+        """
+        ticker_paths = defaultdict(list)
+        period_folders = self.get_period_folders()
+
+        for folder in period_folders:
+            for file in folder.glob("*.pdf"):
+                pattern = re.compile(r"Analisis_([A-Z]+)_\d{2}-\d{4}\.pdf")
+                if match := pattern.match(file.name):
+                    ticker = match.group(1)
+                    ticker_paths[ticker].append(file)
+
+        # Sort paths for each ticker by date
+        for ticker in ticker_paths:
+            ticker_paths[ticker].sort(key=lambda x: datetime.strptime(
+                x.parent.name, "%m-%Y"
+            ))
+
+        return dict(ticker_paths)
 
 import json
 import time
@@ -113,8 +238,8 @@ class ReportAnalyzer:
 
         risks1 = query_engine1.query(risk_prompt).response
         risks2 = query_engine2.query(risk_prompt).response
-        print(risks1)
-        print(risks2)
+        #print(risks1)
+        #print(risks2)
         comparison_prompt = f"""
         Compare these two sets of risks and categorize the changes:
 
@@ -140,7 +265,7 @@ class ReportAnalyzer:
         completion = client.beta.chat.completions.parse(model="gpt-4o-mini", messages = [
         {"role":"system", "content":"You are an expert in financial analysis, providing detailed risk assessments."},
         {"role":"user", "content":comparison_prompt}  ], response_format=RiskComparison)
-        print(completion.choices[0].message.parsed)
+        #print(completion.choices[0].message.parsed)
         #print(dir(response))
         return completion.choices[0].message.parsed
 
@@ -156,10 +281,20 @@ class Command(BaseCommand):
             help='Print what would be done without actually performing the analysis'
         )
         parser.add_argument(
+            '--do_all',
+            action='store_true',
+            help='Print what would be done without actually performing the analysis'
+        )
+        parser.add_argument(
             '--output-dir',
             type=str,
             default='analysis_results',
             help='Directory to store analysis results'
+        )
+        parser.add_argument(
+            '--start-year',
+            type=int,
+            help='The year to start processing quarters from (e.g., 2022)'
         )
 
     def write_results(self, output_dir: Path, ticker: str, period1: str, period2: str, results: str):
@@ -194,7 +329,67 @@ class Command(BaseCommand):
 
             analyzer = ReportAnalyzer(api_key)
             locator = ReportLocator(data_folder)
+            start_year = options.get('start_year')
 
+            if options['do_all']:
+                quarter_pairs = locator.get_consecutive_quarter_pairs()
+
+                # Filter pairs by the start year if provided
+                if start_year:
+                    quarter_pairs = [
+                        (q1, q2) for q1, q2 in quarter_pairs
+                        if datetime.strptime(q1.name, "%m-%Y").year >= start_year
+                    ]
+                for earlier_quarter, next_quarter in quarter_pairs:
+                    print(f"Processing quarters: {earlier_quarter.name} -> {next_quarter.name}")
+                    old_tickers = locator.get_tickers_in_period(earlier_quarter)
+                    new_tickers = locator.get_tickers_in_period(next_quarter)
+                    for tick in old_tickers:
+                        filename = f"{tick}_{earlier_quarter.name}_to_{next_quarter.name}_analysis.txt"
+                        out_file = output_dir / Path(filename)
+                        if out_file.exists():
+                            print(f"comparison {tick} : {earlier_quarter.name} -> {next_quarter.name} already exists. Skipping")
+                            continue
+                        print(f"Processing {tick}")
+                        if tick in new_tickers:
+                            file1 = locator.get_company_file(earlier_quarter, tick)
+                            file2 = locator.get_company_file(next_quarter, tick)
+                            if not file1 or not file2:
+                                self.stdout.write(self.style.WARNING(
+                                    f"Missing files for comparison {tick} : {earlier_quarter.name} -> {next_quarter.name}"
+                                ))
+                                continue
+
+                            comparison = analyzer.compare_reports(str(file1), str(file2))
+                            if not comparison:
+                                self.stdout.write(self.style.WARNING("Comparison produced no results"))
+                                continue
+
+                            output_file = self.write_results(
+                                output_dir,
+                                tick,
+                                earlier_quarter.name,
+                                next_quarter.name,
+                                comparison
+                            )
+                            # We'll use period 2 as reference
+                            financial_risk, created = Model_Risk.objects.get_or_create(
+                                ticker=tick,
+                                year=int(datetime.strptime(next_quarter.name, '%m-%Y').year),
+                                month=int(datetime.strptime(next_quarter.name, '%m-%Y').month),
+                                defaults={
+                                    'new_risks': [i.name + "\n" + i.description for i in comparison.new_risks],
+                                    'old_risks': [i.name + "\n" + i.description for i in comparison.removed_risks],
+                                    'modified_risks': [i.name + "\n" + i.description for i in comparison.modified_risks]
+                                })
+                            financial_risk.save()
+                            if output_file:
+                                self.stdout.write(self.style.SUCCESS(
+                                    f"Successfully analyzed {tick} for periods "
+                                    f"{earlier_quarter.name} -> {next_quarter.name}\n"
+                                    f"Results written to: {output_file}"
+                                ))
+                return
             ticker = locator.get_first_ticker()
             if not ticker:
                 self.stdout.write(self.style.ERROR("No tickers found in the data folder"))
