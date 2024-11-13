@@ -29,25 +29,12 @@ from llama_index.core.llms import ChatMessage
 from llama_index.llms.openai import OpenAI
 import shutil
 import tempfile
-
+from llama_index.embeddings.openai import OpenAIEmbedding
 
 def get_api_key(file_path):
     with open(file_path, 'r') as file:
         api_key = file.read().strip()  # Strip removes any extra spaces or newlines
     return api_key
-
-class RiskCategory(Enum):
-    OPERATIONAL = "Operational"
-    FINANCIAL = "Financial"
-    MARKET = "Market"
-    REGULATORY = "Regulatory"
-
-
-class Likelihood(Enum):
-    HIGH = "High"
-    MEDIUM = "Medium"
-    LOW = "Low"
-
 
 @dataclass
 class Risk:
@@ -91,7 +78,12 @@ class FinancialDocumentAnalyzer:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         # Initialize LlamaIndex settings
         self.llm = OpenAI(model='gpt-4o-mini', api_key=api_key)
+        embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_key=api_key)
+        # Update settings
         Settings.llm = self.llm
+        Settings.embed_model = embed_model
+
+        self.node_parser = SimpleNodeParser.from_defaults()
         self.node_parser = SimpleNodeParser.from_defaults()
 
         # Define query templates
@@ -101,9 +93,9 @@ class FinancialDocumentAnalyzer:
         """Initialize query templates for different analysis components"""
         self.queries = {
             "business_overview": """
-                Extract a concise business overview from the financial document.
+                Extract a complete business overview from the financial document.
                 Focus on: main business activities, revenue streams, and market position.
-                Be specific and include key details about the company's operations, including countries and regions.
+                Be specific and include key details about the company's operations, including countries and regions. Format it in a readable way.Write in english.
             """,
 
             "risks": """
@@ -112,7 +104,7 @@ class FinancialDocumentAnalyzer:
                 1. Risk Category (must be one of: Operational, Financial, Market, Regulatory)
                 2. Detailed description of the risk
                 3. Potential impact on the business
-                Format each risk on a new line starting with the category. Go in detail about said risks.
+                Format each risk on a new line starting with the category. Go in detail about said risks, specially numerical aspects, dates and names.  Write in english.
             """,
 
             "metrics": """
@@ -121,7 +113,7 @@ class FinancialDocumentAnalyzer:
                 - Net Income (in millions/billions)
                 - Operating Margin (as percentage)
                 - Debt to Equity Ratio
-                Provide only the numbers, with each metric on a new line.
+                Provide only the numbers, with each metric on a new line. Write in english.
             """,
 
             "changes": """
@@ -130,7 +122,7 @@ class FinancialDocumentAnalyzer:
                 1. Specify the category of change
                 2. Describe what changed
                 3. Explain the impact
-                List each change on a new line. Be very detailed about these changes.
+                List each change on a new line. Be very detailed about these changes. Write in english.
             """,
 
             "outlook": """
@@ -139,7 +131,7 @@ class FinancialDocumentAnalyzer:
                 1. Specify the category
                 2. Describe the expected change or development
                 3. Indicate likelihood as: High, Medium, or Low
-                List each point on a new line. Be very detailed about these outlooks.
+                List each point on a new line. Be very detailed about these outlooks.Write in english.
             """
         }
 
@@ -249,15 +241,14 @@ class FinancialDocumentAnalyzer:
                     if '(' in rest and ')' in rest:
                         description_part, likelihood_part = rest.rsplit('(', 1)
                         likelihood_str = likelihood_part.replace(')', '').strip().upper()
-                        likelihood = Likelihood
                     else:
                         description_part = rest
-                        likelihood = 'Unknown'
+                        likelihood_str = 'Unknown'
 
                     outlook_items.append(FutureOutlook(
                         category=category.strip(),
                         description=description_part.strip(),
-                        likelihood=likelihood
+                        likelihood=likelihood_str
                     ))
             except Exception as e:
                 print(f"Error parsing outlook line: {line}, Error: {str(e)}")
@@ -360,7 +351,7 @@ class FileSearcher:
         # Get all tickers as dataframe
         self.all_tickers = Ticker.get_all_tickers_as_dataframe()
 
-    def search_files_for_tickers(self):
+    def search_files_for_tickers(self, start_year = 2023):
         if self.all_tickers is None:
             raise ValueError("Tickers dataframe is not loaded. Call load_tickers() first.")
 
@@ -373,19 +364,19 @@ class FileSearcher:
                 if folder.is_dir() and '-' in folder.name:  # Assuming folders are named as 'MM-YYYY'
                     # Extract month and year from folder name
                     month, year = folder.name.split('-')
+                    if int(year) >= start_year:
+                        # Construct expected filename
+                        file_name = f"Analisis_{ticker}_{folder.name}.pdf"
+                        file_path = folder / file_name
 
-                    # Construct expected filename
-                    file_name = f"Analisis_{ticker}_{folder.name}.pdf"
-                    file_path = folder / file_name
-
-                    # Check if the file exists
-                    if file_path.exists():
-                        print(f"File found: {file_path}")
-                        response = self.parse_pdf(file_path)
-                        if response:
-                            self.save_response(ticker, year, month, response)
-                    #else:
-                    #    print(f"File not found: {file_name} in {folder}")
+                        # Check if the file exists
+                        if file_path.exists():
+                            print(f"File found: {file_path}")
+                            response = self.parse_pdf(file_path)
+                            if response:
+                                self.save_response(ticker, year, month, response)
+                        #else:
+                        #    print(f"File not found: {file_name} in {folder}")
 
     def parse_pdf(self, file_path):
         retries = 3
@@ -409,13 +400,13 @@ class FileSearcher:
 
                         if analysis:
                             # Access structured data
-                            print(f"Business Overview: {analysis.business_overview}")
-                            for risk in analysis.risks:
-                                print(f"Risk: {risk.category} - {risk.description}")
+                            #print(f"Business Overview: {analysis.business_overview}")
+                            #for risk in analysis.risks:
+                            #    print(f"Risk: {risk.category} - {risk.description}")
 
                             # Get formatted summary
-                            summary = analyzer.get_summary(analysis)
-                            print(summary)
+                            #summary = analyzer.get_summary(analysis)
+                            #print(summary)
 
                             return analysis
                     else:
@@ -453,7 +444,7 @@ class FileSearcher:
         }
         self.results_df = pd.concat([self.results_df, pd.DataFrame([new_row])], ignore_index=True)
         print(f"Saved response for ticker {ticker}, year {year}, and month {month}")
-
+        print(analysis)
         # Save to Django model
         financial_report, created = FinancialReport.objects.get_or_create(
             ticker=ticker,
@@ -467,16 +458,7 @@ class FileSearcher:
                 'future_outlook': [outlook.__dict__ for outlook in analysis.future_outlook],
             }
         )
-
-        if not created:
-            # Update the existing object if it already exists
-            financial_report.business_overview = analysis.business_overview
-            financial_report.risks = [risk.__dict__ for risk in analysis.risks]
-            financial_report.metrics = analysis.metrics.__dict__
-            financial_report.historical_changes = [change.__dict__ for change in analysis.historical_changes]
-            financial_report.future_outlook = [outlook.__dict__ for outlook in analysis.future_outlook]
-            financial_report.save()
-
+        financial_report.save()
         #self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
     def _format_response_as_string(self, analysis):
         """ Helper method to format the analysis as a string for CSV saving. """
@@ -539,7 +521,28 @@ Future Outlook: {analysis.future_outlook}
             return None
 class Command(BaseCommand):
     help = 'Run the utility script'
-
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Print what would be done without actually performing the analysis'
+        )
+        parser.add_argument(
+            '--do_all',
+            action='store_true',
+            help='Print what would be done without actually performing the analysis'
+        )
+        parser.add_argument(
+            '--output-dir',
+            type=str,
+            default='analysis_results',
+            help='Directory to store analysis results'
+        )
+        parser.add_argument(
+            '--start-year',
+            type=int,
+            help='The year to start processing quarters from (e.g., 2022)'
+        )
     def handle(self, *args, **kwargs):
         self.stdout.write('Running utility script...')
         #test_ticker()
@@ -548,7 +551,14 @@ class Command(BaseCommand):
         # Run the test suite
         #unittest.TextTestRunner(verbosity=2).run(suite)
         searcher = FileSearcher(G_datafold, use_llamaindex=True)
-        searcher.search_files_for_tickers()
+        start_year = kwargs['start_year']
+        print(start_year)
+        if start_year:
+            searcher.search_files_for_tickers(start_year = start_year)
+        else:
+            print("Specify start year with --start-year")
+            return
+        #searcher.search_files_for_tickers()
         # Optionally save the results to a CSV file
         output_file = G_datafold/"results.csv"
         searcher.results_df.to_csv(output_file, index=False)
