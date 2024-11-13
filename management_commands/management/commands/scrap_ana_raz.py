@@ -20,7 +20,7 @@ from llama_index.llms.ollama import Ollama
 from dataclasses import dataclass
 from typing import List, Optional
 from enum import Enum
-from llama_index.core import Settings, VectorStoreIndex, Document
+from llama_index.core import Settings, VectorStoreIndex, Document, SimpleDirectoryReader
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
@@ -30,21 +30,25 @@ from llama_index.llms.openai import OpenAI
 import shutil
 import tempfile
 from llama_index.embeddings.openai import OpenAIEmbedding
-
+from pydantic import BaseModel, Field
+from openai import OpenAI as OpenAIog
+from llama_index.program.openai import OpenAIPydanticProgram
+import logging
 def get_api_key(file_path):
     with open(file_path, 'r') as file:
         api_key = file.read().strip()  # Strip removes any extra spaces or newlines
     return api_key
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 @dataclass
-class Risk:
+class Risk(BaseModel):
     category: str
     description: str
     potential_impact: str
 
 
 @dataclass
-class FinancialMetrics:
+class FinancialMetrics(BaseModel):
     revenue: Optional[float] = None
     net_income: Optional[float] = None
     operating_margin: Optional[float] = None
@@ -52,31 +56,37 @@ class FinancialMetrics:
 
 
 @dataclass
-class HistoricalChange:
+class HistoricalChange(BaseModel):
     category: str
     description: str
     impact: str
 
 
 @dataclass
-class FutureOutlook:
+class FutureOutlook(BaseModel):
     category: str
     description: str
     likelihood: str
 
 
 @dataclass
-class FinancialAnalysis:
+class FinancialAnalysis(BaseModel):
     business_overview: str
     risks: List[Risk]
     metrics: FinancialMetrics
     historical_changes: List[HistoricalChange]
     future_outlook: List[FutureOutlook]
 
+class QueryType(Enum):
+    FIN: FinancialMetrics
+    FO: FutureOutlook
+    HIST: HistoricalChange
+    R: Risk
 
 class FinancialDocumentAnalyzer:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         # Initialize LlamaIndex settings
+        self.api_key=api_key
         self.llm = OpenAI(model='gpt-4o-mini', api_key=api_key)
         embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_key=api_key)
         # Update settings
@@ -84,10 +94,10 @@ class FinancialDocumentAnalyzer:
         Settings.embed_model = embed_model
 
         self.node_parser = SimpleNodeParser.from_defaults()
-        self.node_parser = SimpleNodeParser.from_defaults()
+        self._init_query_templates()
+
 
         # Define query templates
-        self._init_query_templates()
 
     def _init_query_templates(self):
         """Initialize query templates for different analysis components"""
@@ -256,37 +266,60 @@ class FinancialDocumentAnalyzer:
 
         return outlook_items
 
-    def analyze_document(self, document_text: str) -> Optional[FinancialAnalysis]:
+    def make_text_query(self, text):
+        return f"""Given the following response:
+
+\"\"\"
+{text}
+\"\"\"
+
+
+Structure the output corectly, do not omit any informatiion in your response. Make sure all the information is conveyed, if information belongs to more than one classification put it on both. Make sure it is clear and concise. 
+"""
+
+    def create_index_for_document(self, file_path: str) -> Optional[VectorStoreIndex]:
         try:
-            # Create document and index
-            document = Document(text=document_text)
-            nodes = self.node_parser.get_nodes_from_documents([document])
-            index = VectorStoreIndex(nodes)
-
-            # Create query engine
-            query_engine = index.as_query_engine()
-
-            # Execute queries and parse responses
-            responses = {}
-            for query_type, query_text in self.queries.items():
-                time.sleep(10)
-                response = query_engine.query(query_text)
-                responses[query_type] = response.response
-
-            # Parse responses into structured data
-            analysis = FinancialAnalysis(
-                business_overview=responses["business_overview"].strip(),
-                risks=self._parse_risks_response(responses["risks"]),
-                metrics=self._parse_metrics_response(responses["metrics"]),
-                historical_changes=self._parse_changes_response(responses["changes"]),
-                future_outlook=self._parse_outlook_response(responses["outlook"])
-            )
-
-            return analysis
-
+            reader = SimpleDirectoryReader(input_files=[file_path])
+            documents = reader.load_data()
+            return VectorStoreIndex.from_documents(documents)
         except Exception as e:
-            print(f"Error analyzing financial document: {str(e)}")
+            logging.error(f"Error creating index for {file_path}: {e}")
             return None
+    def analyze_document(self, document: str) -> Optional[FinancialAnalysis]:
+        # Create document and index
+        #document = Document(text=document_text)
+        index = self.create_index_for_document(document)
+        # Create query engine
+        query_engine = index.as_query_engine()
+
+        # Execute queries and parse responses
+        responses = {}
+        text_query = " "
+        for query_type, query_text in self.queries.items():
+            response = query_engine.query(query_text)
+            responses[query_type] = response.response
+            text_query = text_query + response.response + " - "
+
+        client = OpenAIog(api_key=self.api_key)
+        completion = client.beta.chat.completions.parse(model="gpt-4o-mini", messages=[
+            {"role": "system",
+             "content": "You are an information retrieval and classification tool. You also know how to classify and understand financial information."},
+            {"role": "user", "content": self.make_text_query(text_query)}], response_format=FinancialAnalysis)
+        print(completion.choices[0].message.parsed)
+        exit()
+        # print(dir(response))
+        return completion.choices[0].message.parsed
+
+        # Parse responses into structured data
+        analysis = FinancialAnalysis(
+            business_overview=responses["business_overview"].strip(),
+            risks=self._parse_risks_response(responses["risks"]),
+            metrics=self._parse_metrics_response(responses["metrics"]),
+            historical_changes=self._parse_changes_response(responses["changes"]),
+            future_outlook=self._parse_outlook_response(responses["outlook"])
+        )
+
+        return analysis
 
     def get_summary(self, analysis: FinancialAnalysis) -> str:
         """Generate a human-readable summary from the analysis"""
@@ -381,7 +414,6 @@ class FileSearcher:
     def parse_pdf(self, file_path):
         retries = 3
         for attempt in range(retries):
-            try:
                 with fitz.open(file_path) as pdf_file:
                     text_content = ""
                     # Extract text from each page
@@ -396,7 +428,7 @@ class FileSearcher:
                         analyzer = FinancialDocumentAnalyzer(api_key=get_api_key(G_root_dir / 'api_key'))
 
                         # Analyze document
-                        analysis = analyzer.analyze_document(preprocessed_text)
+                        analysis = analyzer.analyze_document(file_path)
 
                         if analysis:
                             # Access structured data
@@ -409,18 +441,6 @@ class FileSearcher:
                             #print(summary)
 
                             return analysis
-                    else:
-                        return self.query_ollama(preprocessed_text)
-            except PermissionError as e:
-                if attempt < retries - 1:
-                    print(f"Permission error encountered, retrying... ({attempt + 1}/{retries})")
-                    time.sleep(1)
-                else:
-                    print(f"Failed to parse PDF {file_path}: {e}")
-                    return None
-            except Exception as e:
-                print(f"Failed to parse PDF {file_path}: {e}")
-                return None
 
     def preprocess_text(self, text):
         # Remove extra whitespace and line breaks
