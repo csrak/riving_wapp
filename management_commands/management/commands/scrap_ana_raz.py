@@ -40,11 +40,6 @@ def get_api_key(file_path):
     return api_key
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-@dataclass
-class Risk(BaseModel):
-    category: str
-    description: str
-    potential_impact: str
 
 
 @dataclass
@@ -61,6 +56,11 @@ class HistoricalChange(BaseModel):
     description: str
     impact: str
 
+@dataclass
+class Risk(BaseModel):
+    category: str
+    description: str
+    potential_impact: str
 
 @dataclass
 class FutureOutlook(BaseModel):
@@ -306,20 +306,8 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
              "content": "You are an information retrieval and classification tool. You also know how to classify and understand financial information."},
             {"role": "user", "content": self.make_text_query(text_query)}], response_format=FinancialAnalysis)
         print(completion.choices[0].message.parsed)
-        exit()
         # print(dir(response))
         return completion.choices[0].message.parsed
-
-        # Parse responses into structured data
-        analysis = FinancialAnalysis(
-            business_overview=responses["business_overview"].strip(),
-            risks=self._parse_risks_response(responses["risks"]),
-            metrics=self._parse_metrics_response(responses["metrics"]),
-            historical_changes=self._parse_changes_response(responses["changes"]),
-            future_outlook=self._parse_outlook_response(responses["outlook"])
-        )
-
-        return analysis
 
     def get_summary(self, analysis: FinancialAnalysis) -> str:
         """Generate a human-readable summary from the analysis"""
@@ -480,16 +468,19 @@ class FileSearcher:
         )
         financial_report.save()
         #self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
-    def _format_response_as_string(self, analysis):
-        """ Helper method to format the analysis as a string for CSV saving. """
-        return f"""
-Business Overview: {analysis.business_overview}
-Risks: {analysis.risks}
-Metrics: {analysis.metrics}
-Historical Changes: {analysis.historical_changes}
-Future Outlook: {analysis.future_outlook}
-"""
 
+    def _format_response_as_string(self, financial_analysis):
+        def format_list(items: List[BaseModel], title: str) -> str:
+            return f"\n{title}:\n" + "\n".join(f"- {item.to_json()}" for item in items)
+
+        result = f"Business Overview:\n{financial_analysis.business_overview}\n"
+
+        result += format_list(financial_analysis.risks, "Risks")
+        result += f"\n\nMetrics:\n{financial_analysis.metrics.to_json()}\n"
+        result += format_list(financial_analysis.historical_changes, "Historical Changes")
+        result += format_list(financial_analysis.future_outlook, "Future Outlook")
+
+        return result
     def query_llamaindex(self, preprocessed_text):
         # Use OpenAI's GPT model to query the document
         try:
