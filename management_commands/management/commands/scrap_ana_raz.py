@@ -40,48 +40,40 @@ def get_api_key(file_path):
     return api_key
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# class BaseModel:
+#     def to_json(self):
+#         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
-
-@dataclass
 class FinancialMetrics(BaseModel):
-    revenue: Optional[float] = None
-    net_income: Optional[float] = None
-    operating_margin: Optional[float] = None
-    debt_to_equity: Optional[float] = None
-
-
-@dataclass
+    revenue: str
+    net_income: str
+    operating_margin: str
+    gross_profit_margin: str
+    debt_to_equity: str
+    earnings_per_share: str
+    free_cash_flow: str
 class HistoricalChange(BaseModel):
     category: str
     description: str
     impact: str
 
-@dataclass
 class Risk(BaseModel):
     category: str
     description: str
     potential_impact: str
 
-@dataclass
 class FutureOutlook(BaseModel):
     category: str
     description: str
     likelihood: str
 
 
-@dataclass
 class FinancialAnalysis(BaseModel):
     business_overview: str
-    risks: List[Risk]
-    metrics: FinancialMetrics
-    historical_changes: List[HistoricalChange]
-    future_outlook: List[FutureOutlook]
-
-class QueryType(Enum):
-    FIN: FinancialMetrics
-    FO: FutureOutlook
-    HIST: HistoricalChange
-    R: Risk
+    risks: list[Risk]
+    metrics: Optional[FinancialMetrics]
+    historical_changes: list[HistoricalChange]
+    future_outlook: list[FutureOutlook]
 
 class FinancialDocumentAnalyzer:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
@@ -122,8 +114,11 @@ class FinancialDocumentAnalyzer:
                 - Revenue (in millions/billions)
                 - Net Income (in millions/billions)
                 - Operating Margin (as percentage)
+                - Gross Profit Margin (as percentage)
                 - Debt to Equity Ratio
-                Provide only the numbers, with each metric on a new line. Write in english.
+                - Earnings per Share
+                - Free Cash Flow
+                Provide only the numbers and currency units, with each metric on a new line. Write in english.
             """,
 
             "changes": """
@@ -145,128 +140,8 @@ class FinancialDocumentAnalyzer:
             """
         }
 
-    def _parse_risks_response(self, response: str) -> List[Risk]:
-        risks = []
-        lines = [line.strip() for line in response.split('\n') if line.strip()]
-
-        for line in lines:
-            try:
-                # Expected format: "Category: Description (Impact: impact_text)"
-                parts = line.split(':', 2)
-                if len(parts) >= 2:
-                    category_str = parts[0].strip().upper()
-                    remaining = parts[1].strip()
-
-                    # Split description and impact
-                    if '(Impact:' in remaining:
-                        desc_part, impact_part = remaining.split('(Impact:', 1)
-                        description = desc_part.strip()
-                        impact = impact_part.replace(')', '').strip()
-                    else:
-                        description = remaining
-                        impact = "Not specified"
-
-                    # Map category string to enum
-                        category = category_str
-
-                    risks.append(Risk(
-                        category=category,
-                        description=description,
-                        potential_impact=impact
-                    ))
-            except Exception as e:
-                print(f"Error parsing risk line: {line}, Error: {str(e)}")
-                continue
-
-        return risks
-
-    def _parse_metrics_response(self, response: str) -> FinancialMetrics:
-        metrics = FinancialMetrics()
-        lines = [line.strip() for line in response.split('\n') if line.strip()]
-
-        for line in lines:
-            try:
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip().lower()
-                    value = value.strip()
-
-                    # Remove any currency symbols and convert to float
-                    value = ''.join(c for c in value if c.isdigit() or c in '.-')
-                    try:
-                        float_value = float(value)
-                    except ValueError:
-                        continue
-
-                    if 'revenue' in key:
-                        metrics.revenue = float_value
-                    elif 'net income' in key:
-                        metrics.net_income = float_value
-                    elif 'operating margin' in key:
-                        metrics.operating_margin = float_value
-                    elif 'debt to equity' in key:
-                        metrics.debt_to_equity = float_value
-            except Exception as e:
-                print(f"Error parsing metric line: {line}, Error: {str(e)}")
-                continue
-
-        return metrics
-
-    def _parse_changes_response(self, response: str) -> List[HistoricalChange]:
-        changes = []
-        lines = [line.strip() for line in response.split('\n') if line.strip()]
-
-        for line in lines:
-            try:
-                if ':' in line:
-                    category, rest = line.split(':', 1)
-                    # Look for impact indication
-                    if '(Impact:' in rest:
-                        description, impact = rest.split('(Impact:', 1)
-                        impact = impact.replace(')', '').strip()
-                    else:
-                        description = rest
-                        impact = "Not specified"
-
-                    changes.append(HistoricalChange(
-                        category=category.strip(),
-                        description=description.strip(),
-                        impact=impact
-                    ))
-            except Exception as e:
-                print(f"Error parsing change line: {line}, Error: {str(e)}")
-                continue
-
-        return changes
-
-    def _parse_outlook_response(self, response: str) -> List[FutureOutlook]:
-        outlook_items = []
-        lines = [line.strip() for line in response.split('\n') if line.strip()]
-
-        for line in lines:
-            try:
-                if ':' in line:
-                    category, rest = line.split(':', 1)
-                    # Look for likelihood indication
-                    if '(' in rest and ')' in rest:
-                        description_part, likelihood_part = rest.rsplit('(', 1)
-                        likelihood_str = likelihood_part.replace(')', '').strip().upper()
-                    else:
-                        description_part = rest
-                        likelihood_str = 'Unknown'
-
-                    outlook_items.append(FutureOutlook(
-                        category=category.strip(),
-                        description=description_part.strip(),
-                        likelihood=likelihood_str
-                    ))
-            except Exception as e:
-                print(f"Error parsing outlook line: {line}, Error: {str(e)}")
-                continue
-
-        return outlook_items
-
-    def make_text_query(self, text):
+    @staticmethod
+    def make_text_query( text):
         return f"""Given the following response:
 
 \"\"\"
@@ -276,8 +151,9 @@ class FinancialDocumentAnalyzer:
 
 Structure the output corectly, do not omit any informatiion in your response. Make sure all the information is conveyed, if information belongs to more than one classification put it on both. Make sure it is clear and concise. 
 """
+    @staticmethod
 
-    def create_index_for_document(self, file_path: str) -> Optional[VectorStoreIndex]:
+    def create_index_for_document(file_path: str) -> Optional[VectorStoreIndex]:
         try:
             reader = SimpleDirectoryReader(input_files=[file_path])
             documents = reader.load_data()
@@ -285,7 +161,7 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         except Exception as e:
             logging.error(f"Error creating index for {file_path}: {e}")
             return None
-    def analyze_document(self, document: str) -> Optional[FinancialAnalysis]:
+    def analyze_document(self, document: str):
         # Create document and index
         #document = Document(text=document_text)
         index = self.create_index_for_document(document)
@@ -305,7 +181,24 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
             {"role": "system",
              "content": "You are an information retrieval and classification tool. You also know how to classify and understand financial information."},
             {"role": "user", "content": self.make_text_query(text_query)}], response_format=FinancialAnalysis)
-        print(completion.choices[0].message.parsed)
+        #if completion.refusal:
+        #    print(completion.refusal)
+        #    exit()
+        print(response["business_overview"])
+        print(completion.choices[0].message.parsed.business_overview, '\n')
+        print("------------------------------------------------------------------")
+        risks_as_dict = [dict(r) for r in completion.choices[0].message.parsed.risks]
+        for r in risks_as_dict:
+            print(r, '\n')
+        metrics = dict(completion.choices[0].message.parsed.metrics)
+        print(metrics, '\n')
+        hist_as_dict = [dict(r) for r in completion.choices[0].message.parsed.historical_changes]
+        for r in hist_as_dict:
+            print(r, '\n')
+        future_outlook_as_dict = [dict(r) for r in completion.choices[0].message.parsed.future_outlook]
+        for r in future_outlook_as_dict:
+            print(r, '\n')
+        exit()
         # print(dir(response))
         return completion.choices[0].message.parsed
 
@@ -452,7 +345,7 @@ class FileSearcher:
         }
         self.results_df = pd.concat([self.results_df, pd.DataFrame([new_row])], ignore_index=True)
         print(f"Saved response for ticker {ticker}, year {year}, and month {month}")
-        print(analysis)
+        print(self._format_response_as_string(analysis))
         # Save to Django model
         financial_report, created = FinancialReport.objects.get_or_create(
             ticker=ticker,
