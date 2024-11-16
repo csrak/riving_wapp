@@ -184,9 +184,11 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         #if completion.refusal:
         #    print(completion.refusal)
         #    exit()
-        print(response["business_overview"])
+        answer = completion.choices[0].message.parsed
+        print(responses["business_overview"])
         print(completion.choices[0].message.parsed.business_overview, '\n')
         print("------------------------------------------------------------------")
+        answer.business_overview = responses["business_overview"]
         risks_as_dict = [dict(r) for r in completion.choices[0].message.parsed.risks]
         for r in risks_as_dict:
             print(r, '\n')
@@ -198,7 +200,6 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         future_outlook_as_dict = [dict(r) for r in completion.choices[0].message.parsed.future_outlook]
         for r in future_outlook_as_dict:
             print(r, '\n')
-        exit()
         # print(dir(response))
         return completion.choices[0].message.parsed
 
@@ -312,17 +313,7 @@ class FileSearcher:
                         analysis = analyzer.analyze_document(file_path)
 
                         if analysis:
-                            # Access structured data
-                            #print(f"Business Overview: {analysis.business_overview}")
-                            #for risk in analysis.risks:
-                            #    print(f"Risk: {risk.category} - {risk.description}")
-
-                            # Get formatted summary
-                            #summary = analyzer.get_summary(analysis)
-                            #print(summary)
-
                             return analysis
-
     def preprocess_text(self, text):
         # Remove extra whitespace and line breaks
         text = re.sub(r'\s+', ' ', text).strip()
@@ -337,31 +328,22 @@ class FileSearcher:
 
     def save_response(self, ticker, year, month, analysis):
         # Save the response to the CSV file for debugging
-        new_row = {
-            'Ticker': ticker,
-            'Year': year,
-            'Month': month,
-            'Response': self._format_response_as_string(analysis)
-        }
-        self.results_df = pd.concat([self.results_df, pd.DataFrame([new_row])], ignore_index=True)
-        print(f"Saved response for ticker {ticker}, year {year}, and month {month}")
-        print(self._format_response_as_string(analysis))
-        # Save to Django model
         financial_report, created = FinancialReport.objects.get_or_create(
             ticker=ticker,
             year=year,
             month=month,
             defaults={
                 'business_overview': analysis.business_overview,
-                'risks': [risk.__dict__ for risk in analysis.risks],
-                'metrics': analysis.metrics.__dict__,
-                'historical_changes': [change.__dict__ for change in analysis.historical_changes],
-                'future_outlook': [outlook.__dict__ for outlook in analysis.future_outlook],
+                'risks': [dict(r) for r in analysis.risks],
+                'metrics': dict(analysis.metrics),
+                'historical_changes': [dict(r) for r in analysis.historical_changes],
+                'future_outlook': [dict(r) for r in analysis.future_outlook],
             }
         )
         financial_report.save()
+        exit()
         #self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
-
+        return
     def _format_response_as_string(self, financial_analysis):
         def format_list(items: List[BaseModel], title: str) -> str:
             return f"\n{title}:\n" + "\n".join(f"- {item.to_json()}" for item in items)
