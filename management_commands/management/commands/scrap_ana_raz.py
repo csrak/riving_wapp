@@ -281,15 +281,18 @@ class FileSearcher:
                     month, year = folder.name.split('-')
                     if int(year) >= start_year:
                         # Construct expected filename
-                        file_name = f"Analisis_{ticker}_{folder.name}.pdf"
-                        file_path = folder / file_name
+                        if not FinancialReport.objects.filter(ticker=ticker,year=year,month=month).exists():
+                            file_name = f"Analisis_{ticker}_{folder.name}.pdf"
+                            file_path = folder / file_name
 
-                        # Check if the file exists
-                        if file_path.exists():
-                            print(f"File found: {file_path}")
-                            response = self.parse_pdf(file_path)
-                            if response:
-                                self.save_response(ticker, year, month, response)
+                            # Check if the file exists
+                            if file_path.exists():
+                                print(f"File found: {file_path}")
+                                response = self.parse_pdf(file_path)
+                                if response:
+                                    self.save_response(ticker, year, month, response)
+                        else:
+                            print(f"The {ticker} for year {year} and month {month} already exists in database, skipping.")
                         #else:
                         #    print(f"File not found: {file_name} in {folder}")
 
@@ -341,7 +344,6 @@ class FileSearcher:
             }
         )
         financial_report.save()
-        exit()
         #self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
         return
     def _format_response_as_string(self, financial_analysis):
