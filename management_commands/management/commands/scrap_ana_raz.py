@@ -97,7 +97,7 @@ class FinancialDocumentAnalyzer:
             "business_overview": """
                 Extract a complete business overview from the financial document.
                 Focus on: main business activities, revenue streams, and market position.
-                Be specific and include key details about the company's operations, including countries and regions. Format it in a readable way.Write in english.
+                Be specific and include key details about the company's operations, including countries and regions. Format it in a readable way.Write in english. If anything is missing say it is missing in the document..
             """,
 
             "risks": """
@@ -106,7 +106,7 @@ class FinancialDocumentAnalyzer:
                 1. Risk Category (must be one of: Operational, Financial, Market, Regulatory)
                 2. Detailed description of the risk
                 3. Potential impact on the business
-                Format each risk on a new line starting with the category. Go in detail about said risks, specially numerical aspects, dates and names.  Write in english.
+                Format each risk on a new line starting with the category. Go in detail about said risks, specially numerical aspects, dates and names.  Write in english.If anything is missing say it is missing in the document.
             """,
 
             "metrics": """
@@ -127,7 +127,7 @@ class FinancialDocumentAnalyzer:
                 1. Specify the category of change
                 2. Describe what changed
                 3. Explain the impact
-                List each change on a new line. Be very detailed about these changes. Write in english.
+                List each change on a new line. Be very detailed about these changes. Write in english. If anything is missing say it is missing in the document.
             """,
 
             "outlook": """
@@ -136,7 +136,7 @@ class FinancialDocumentAnalyzer:
                 1. Specify the category
                 2. Describe the expected change or development
                 3. Indicate likelihood as: High, Medium, or Low
-                List each point on a new line. Be very detailed about these outlooks.Write in english.
+                List each point on a new line. Be very detailed about these outlooks.Write in english.If anything is missing say it is missing in the document.
             """
         }
 
@@ -192,8 +192,11 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         risks_as_dict = [dict(r) for r in completion.choices[0].message.parsed.risks]
         for r in risks_as_dict:
             print(r, '\n')
-        metrics = dict(completion.choices[0].message.parsed.metrics)
-        print(metrics, '\n')
+        try:
+            metrics = dict(completion.choices[0].message.parsed.metrics)
+            print(metrics, '\n') s3 xz
+        except TypeError:
+            print("Metrics Missing")
         hist_as_dict = [dict(r) for r in completion.choices[0].message.parsed.historical_changes]
         for r in hist_as_dict:
             print(r, '\n')
@@ -331,6 +334,10 @@ class FileSearcher:
 
     def save_response(self, ticker, year, month, analysis):
         # Save the response to the CSV file for debugging
+        try:
+            metrics = dict(analysis.metrics)
+        except TypeError:
+            metrics = ["Missing"]
         financial_report, created = FinancialReport.objects.get_or_create(
             ticker=ticker,
             year=year,
@@ -338,7 +345,7 @@ class FileSearcher:
             defaults={
                 'business_overview': analysis.business_overview,
                 'risks': [dict(r) for r in analysis.risks],
-                'metrics': dict(analysis.metrics),
+                'metrics':metrics ,
                 'historical_changes': [dict(r) for r in analysis.historical_changes],
                 'future_outlook': [dict(r) for r in analysis.future_outlook],
             }

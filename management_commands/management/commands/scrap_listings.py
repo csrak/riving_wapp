@@ -11,9 +11,15 @@ from django.core.management.base import BaseCommand
 from finriv.utils.scrapping_classes import Ticker,CmfScraping
 
 class Command(BaseCommand):
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--start-year',
+            type=int,
+            help='The year to start processing quarters from (e.g., 2022)'
+        )
     def handle(self, *args, **kwargs):
         #unittest.main()
-        start_year = 2013
+        start_year = kwargs['start_year']
         end_year = None
         if end_year is None:
             end_year = datetime.datetime.now().year
