@@ -40,69 +40,80 @@ def calculate_ratios(ticker, date):
         last_4_quarters = FinancialData.objects.filter(ticker=ticker).order_by('-date')[:4]
 
         # If we have fewer than 4 quarters, we can't annualize properly
-        if len(last_4_quarters) < 4:
-            return None
+        if not (len(last_4_quarters) < 4):
+            # Aggregate data for the last 4 quarters
+            aggregated_data = {
+                'revenue': sum([d.revenue for d in last_4_quarters if d.revenue is not None]),
+                'net_profit': sum([d.net_profit for d in last_4_quarters if d.net_profit is not None]),
+                'operating_profit': sum([d.operating_profit for d in last_4_quarters if d.operating_profit is not None]),
+                'eps': sum([d.eps for d in last_4_quarters if d.eps is not None]),
+                'cost_of_sales': sum([d.cost_of_sales for d in last_4_quarters if d.cost_of_sales is not None]),
+                'ebit': sum([d.ebit for d in last_4_quarters if d.ebit is not None]),
+                'depreciation': sum([d.depreciation for d in last_4_quarters if d.depreciation is not None]),
+                'interest': sum([d.interest for d in last_4_quarters if d.interest is not None]),
+            }
 
-        # Aggregate data for the last 4 quarters
-        aggregated_data = {
-            'revenue': sum([d.revenue for d in last_4_quarters if d.revenue is not None]),
-            'net_profit': sum([d.net_profit for d in last_4_quarters if d.net_profit is not None]),
-            'operating_profit': sum([d.operating_profit for d in last_4_quarters if d.operating_profit is not None]),
-            'eps': sum([d.eps for d in last_4_quarters if d.eps is not None]),
-            'cost_of_sales': sum([d.cost_of_sales for d in last_4_quarters if d.cost_of_sales is not None]),
-            'ebit': sum([d.ebit for d in last_4_quarters if d.ebit is not None]),
-            'depreciation': sum([d.depreciation for d in last_4_quarters if d.depreciation is not None]),
-            'interest': sum([d.interest for d in last_4_quarters if d.interest is not None]),
-        }
-
-        # Use the latest balance sheet data for these metrics
-        balance_sheet_data = {
-            'equity': latest_financial_data.equity,
-            'assets': latest_financial_data.assets,
-            'liabilities': latest_financial_data.liabilities,
-            'current_assets': latest_financial_data.current_assets,
-            'current_liabilities': latest_financial_data.current_liabilities,
-            'inventories': latest_financial_data.inventories,
-            'cash': latest_financial_data.cash,
-            'shares': latest_financial_data.shares,
-        }
+            # Use the latest balance sheet data for these metrics
+            balance_sheet_data = {
+                'equity': latest_financial_data.equity,
+                'assets': latest_financial_data.assets,
+                'liabilities': latest_financial_data.liabilities,
+                'current_assets': latest_financial_data.current_assets,
+                'current_liabilities': latest_financial_data.current_liabilities,
+                'inventories': latest_financial_data.inventories,
+                'cash': latest_financial_data.cash,
+                'shares': latest_financial_data.shares,
+            }
+        else:
+            print("Not enough quarters for {ticker}")
+            aggregated_data = {
+                'revenue': None,
+                'net_profit': None,
+                'operating_profit': None,
+                'eps': None,
+                'cost_of_sales': None,
+                'ebit': None,
+                'depreciation': None,
+                'interest': None,
+            }
 
         # Fetch the most recent price and market cap data
         price_data = PriceData.objects.filter(ticker=ticker).order_by('-date').first()
         peg_ratio = 0
 
-        if not price_data or not latest_financial_data:
-            return None  # Skip if data is missing
-
-        # Calculate ratios with robust handling for None and zero values price_data.market_cap
-        if aggregated_data['eps']:
-            pe_ratio = to_decimal(price_data.price) / to_decimal(aggregated_data['eps'])
-        elif price_data.market_cap and aggregated_data['net_profit']:
-            pe_ratio = to_decimal(price_data.market_cap) / to_decimal(aggregated_data['net_profit'])
+        if not price_data:
+            print(f"No price data for {ticker}")
         else:
-            pe_ratio = None
+            # Calculate ratios with robust handling for None and zero values price_data.market_cap
+            if aggregated_data['eps']:
+                pe_ratio = to_decimal(price_data.price) / to_decimal(aggregated_data['eps'])
+            elif price_data.market_cap and aggregated_data['net_profit']:
+                pe_ratio = to_decimal(price_data.market_cap) / to_decimal(aggregated_data['net_profit'])
+            else:
+                pe_ratio = None
 
-        if price_data.market_cap:
-            pb_ratio = to_decimal(price_data.market_cap) / to_decimal(balance_sheet_data['equity'] ) if balance_sheet_data['equity']  else None
-            ps_ratio = to_decimal(price_data.market_cap) / to_decimal(aggregated_data['revenue'] ) if aggregated_data['revenue'] else None
-        elif balance_sheet_data['shares']:
-            pb_ratio = to_decimal(price_data.price) / to_decimal(balance_sheet_data['equity'] / balance_sheet_data['shares']) if balance_sheet_data['equity'] else None
-            ps_ratio = to_decimal(price_data.price) / to_decimal(aggregated_data['revenue'] / balance_sheet_data['shares']) if aggregated_data['revenue']  else None
+            if price_data.market_cap:
+                pb_ratio = to_decimal(price_data.market_cap) / to_decimal(balance_sheet_data['equity'] ) if balance_sheet_data['equity']  else None
+                ps_ratio = to_decimal(price_data.market_cap) / to_decimal(aggregated_data['revenue'] ) if aggregated_data['revenue'] else None
+            elif balance_sheet_data['shares']:
+                pb_ratio = to_decimal(price_data.price) / to_decimal(balance_sheet_data['equity'] / balance_sheet_data['shares']) if balance_sheet_data['equity'] else None
+                ps_ratio = to_decimal(price_data.price) / to_decimal(aggregated_data['revenue'] / balance_sheet_data['shares']) if aggregated_data['revenue']  else None
 
-        # Enterprise Value calculation using market cap if available
-        enterprise_value = to_decimal(price_data.market_cap) + to_decimal(balance_sheet_data['liabilities']) - to_decimal(balance_sheet_data['cash']) if price_data.market_cap else None
-        ev_ebit = to_decimal(enterprise_value) / to_decimal(aggregated_data['ebit']) if enterprise_value and aggregated_data['ebit'] else None
+            # Enterprise Value calculation using market cap if available
+            enterprise_value = to_decimal(price_data.market_cap) + to_decimal(balance_sheet_data['liabilities']) - to_decimal(balance_sheet_data['cash']) if price_data.market_cap else None
+            ev_ebit = to_decimal(enterprise_value) / to_decimal(aggregated_data['ebit']) if enterprise_value and aggregated_data['ebit'] else None
 
-        gross_profit_margin = to_decimal((aggregated_data['revenue'] - aggregated_data['cost_of_sales']) / aggregated_data['revenue']) if aggregated_data['revenue'] else None
-        operating_profit_margin = to_decimal(aggregated_data['operating_profit'] / aggregated_data['revenue']) if aggregated_data['revenue'] else None
-        net_profit_margin = to_decimal(aggregated_data['net_profit'] / aggregated_data['revenue']) if aggregated_data['revenue'] else None
-        return_on_assets = to_decimal(aggregated_data['net_profit'] / balance_sheet_data['assets']) if balance_sheet_data['assets'] else None
-        return_on_equity = to_decimal(aggregated_data['net_profit'] / balance_sheet_data['equity']) if balance_sheet_data['equity'] else None
-        debt_to_equity = to_decimal(balance_sheet_data['liabilities'] / balance_sheet_data['equity']) if balance_sheet_data['equity'] else None
-        current_ratio = to_decimal(balance_sheet_data['current_assets'] / balance_sheet_data['current_liabilities']) if balance_sheet_data['current_liabilities'] else None
-        quick_ratio = to_decimal((balance_sheet_data['current_assets'] - balance_sheet_data['inventories']) / balance_sheet_data['current_liabilities']) if balance_sheet_data['current_liabilities'] else None
-        dividend_yield = to_decimal(latest_divs / price_data.price)  if latest_divs else None
-        before_dividend_yield = to_decimal(before_divs / price_data.price)  if latest_divs else None
+            gross_profit_margin = to_decimal((aggregated_data['revenue'] - aggregated_data['cost_of_sales']) / aggregated_data['revenue']) if aggregated_data['revenue'] else None
+            operating_profit_margin = to_decimal(aggregated_data['operating_profit'] / aggregated_data['revenue']) if aggregated_data['revenue'] else None
+            net_profit_margin = to_decimal(aggregated_data['net_profit'] / aggregated_data['revenue']) if aggregated_data['revenue'] else None
+            return_on_assets = to_decimal(aggregated_data['net_profit'] / balance_sheet_data['assets']) if balance_sheet_data['assets'] else None
+            return_on_equity = to_decimal(aggregated_data['net_profit'] / balance_sheet_data['equity']) if balance_sheet_data['equity'] else None
+            debt_to_equity = to_decimal(balance_sheet_data['liabilities'] / balance_sheet_data['equity']) if balance_sheet_data['equity'] else None
+            current_ratio = to_decimal(balance_sheet_data['current_assets'] / balance_sheet_data['current_liabilities']) if balance_sheet_data['current_liabilities'] else None
+            quick_ratio = to_decimal((balance_sheet_data['current_assets'] - balance_sheet_data['inventories']) / balance_sheet_data['current_liabilities']) if balance_sheet_data['current_liabilities'] else None
+
+            dividend_yield = to_decimal(latest_divs / price_data.price)  if latest_divs else None
+            before_dividend_yield = to_decimal(before_divs / price_data.price)  if latest_divs else None
         # Create or update the financial ratio record
         financial_ratio, created = FinancialRatio.objects.update_or_create(
             ticker=ticker,
