@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from tqdm import tqdm
 from django.core.management.base import BaseCommand
-from fin_data_cl.models import PriceData, FinancialData
+from fin_data_cl.models import PriceData, FinancialData, FinancialReport
 import datetime
 from decimal import Decimal, InvalidOperation
 import yfinance as yf  # Yahoo Finance API
@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         # Get a list of unique tickers from FinancialData
-        tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
+        tickers = FinancialReport.objects.values_list('ticker', flat=True).distinct()
 
         # Initialize progress bar
         for ticker in tqdm(tickers, desc="Fetching Prices and Market Caps"):

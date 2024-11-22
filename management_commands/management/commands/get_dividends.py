@@ -3,17 +3,25 @@ from decimal import Decimal, InvalidOperation
 from django.core.management.base import BaseCommand
 from fin_data_cl.models import DividendSummary
 from django.db.models import Max, F
+from pathlib import Path
+from finriv.settings import BASE_DIR, MEDIA_ROOT
+
 import os
+
+
+G_datafold = Path(MEDIA_ROOT) / 'Data' / 'Chile'
+G_root_dir = Path(BASE_DIR)
+
 
 class Command(BaseCommand):
     help = 'Calculate total dividends and dividend counts per year for each company and generate a report of the latest dividends.'
 
     def handle(self, *args, **kwargs):
         # Define the input CSV file path
-        input_file_path = r'C:\Users\s0Csrak\OneDrive\Documents\python\RIVING-Tools\Data\Chile\Dividends\Dividends__2018_2024.csv'  # Update this to the correct file path
+        input_file_path = G_datafold / Path('Dividends\Dividends__2018_2024.csv')
 
         # Define the output report file path
-        output_file_path = r'C:\Users\s0Csrak\OneDrive\Documents\python\RIVING-Tools\Data\Chile\Dividends\Latest_Dividends_Report.txt'  # Update as needed
+        output_file_path = G_datafold / Path('Dividends\Latest_Dividends_Report.txt')
 
         # Create a dictionary to hold the aggregated data
         dividend_data = {}

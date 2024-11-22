@@ -1,6 +1,6 @@
 import math
 from django.core.management.base import BaseCommand
-from fin_data_cl.models import FinancialData, FinancialRatio, PriceData, DividendSummary
+from fin_data_cl.models import FinancialData, FinancialRatio, PriceData, DividendSummary, FinancialReport
 from decimal import Decimal
 
 
@@ -138,10 +138,10 @@ def calculate_ratios(ticker, date):
         )
 
     except FinancialData.DoesNotExist:
-        print(f"Financial data for ticker {ticker} on {date} not found.")
+        #print(f"Financial data for ticker {ticker} on {date} not found.")
         return None
     except Exception as e:
-        print(f"Error calculating ratios for ticker {ticker} on {date}: {str(e)}")
+        #print(f"Error calculating ratios for ticker {ticker} on {date}: {str(e)}")
         return None
 
 def to_decimal(value):
@@ -155,10 +155,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         # Get unique tickers and dates from FinancialData
-        tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
+        tickers = FinancialReport.objects.values_list('ticker', flat=True).distinct()
 
         for ticker in tickers:
             dates = FinancialData.objects.filter(ticker=ticker).values_list('date', flat=True).distinct()
-            for date in dates:
+            if dates:
+                for date in dates:
+                    calculate_ratios(ticker, date)
+                    print(f"Ratios calculated for {ticker} on {date}.")
+            else:
                 calculate_ratios(ticker, date)
-                print(f"Ratios calculated for {ticker} on {date}.")
+                print(f"Only dividend Ratios calculated for {ticker} on {date}.")
