@@ -113,8 +113,8 @@ class FinancialRatio(models.Model):
     debt_to_equity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Debt-to-Equity
     current_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Current Ratio
     quick_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Quick Ratio
-    dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield
-    before_dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield last year
+    dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield this year
+    before_dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield previous year
     class Meta:
         unique_together = ('ticker', 'date')
         verbose_name = 'Financial Ratio'
