@@ -19,4 +19,6 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('', include('fin_data_cl.urls')),  # Include your app's URLs here
+    path('', include('price_plots.urls')),  # Include your app's URLs here
+
 ]

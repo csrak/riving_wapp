@@ -32,6 +32,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'price_plots',
     'fin_data_cl',
     'django_q',
     "django.contrib.admin",
