@@ -2,82 +2,119 @@ import time
 import pandas as pd
 from tqdm import tqdm
 from django.core.management.base import BaseCommand
-from fin_data_cl.models import PriceData, FinancialData, FinancialReport
+from fin_data_cl.models import PriceData, FinancialData
 import datetime
 from decimal import Decimal, InvalidOperation
 import yfinance as yf  # Yahoo Finance API
-
+from django.db import transaction
 
 # Function to ensure values are compatible with Django DecimalField
 def to_decimal(value):
     try:
-        return Decimal(str(value))
+        return Decimal(str(value)) if value is not None else None
     except (InvalidOperation, ValueError):
         return None
 
 
-# Function to get the latest available price and market cap using Yahoo Finance API
-def yahoo_quote_cl(ticker):
-    # Append .SN for Chilean stocks
+def fetch_stock_data(ticker, period="1mo"):
+    """
+    Fetch historical stock data for a given ticker
+    Returns a list of PriceData objects
+    """
     ticker_sn = ticker + '.SN'
+    price_data_objects = []
 
     try:
-        # Fetch the data using yfinance
         stock = yf.Ticker(ticker_sn)
-        hist = stock.history(period="1mo")  # Get the last 1 month to ensure we capture the last transaction
+        hist = stock.history(period=period)
 
         if hist.empty:
-            print(
-                f"Warning: No data returned for ticker {ticker_sn}. It may not be transacted anymore or not available on Yahoo Finance.")
-            return None, None
+            print(f"Warning: No data returned for ticker {ticker_sn}")
+            return []
 
-        # Get the last available closing price
-        stock_price = hist['Close'].dropna().iloc[-1]  # Get the last non-NaN close price
-
-        # Fetch the market cap from the stock info
+        # Get market cap from stock info
         stock_info = stock.info
-        market_cap = stock_info.get('marketCap', None)
+        market_cap = to_decimal(stock_info.get('marketCap'))
 
-        if stock_price is not None:
-            stock_price = float(stock_price)
+        # Process each day's data
+        for date, row in hist.iterrows():
+            price_data = PriceData(
+                ticker=ticker,
+                date=date.date(),
+                price=to_decimal(row.get('Close')),  # Using Close as the main price
+                market_cap=market_cap,
+                open_price=to_decimal(row.get('Open')),
+                high_price=to_decimal(row.get('High')),
+                low_price=to_decimal(row.get('Low')),
+                close_price=to_decimal(row.get('Close')),
+                adj_close=to_decimal(row.get('Close')),  # Using Close as Adj Close if not available
+                volume=row.get('Volume')
+            )
+            price_data_objects.append(price_data)
 
-        if market_cap is not None:
-            market_cap = float(market_cap)
-
-        return to_decimal(stock_price), to_decimal(market_cap)
+        return price_data_objects
 
     except Exception as e:
         print(f"Error fetching data for ticker {ticker_sn}: {str(e)}")
-        return None, None
+        return []
 
 
 class Command(BaseCommand):
-    help = 'Populate prices and market caps for each ticker using the Yahoo Finance API'
+    help = 'Populate historical price data for each ticker using the Yahoo Finance API'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--period',
+            type=str,
+            default='1mo',
+            help='Period to fetch (e.g., 1mo, 3mo, 6mo, 1y, 2y, 5y, max)'
+        )
+        parser.add_argument(
+            '--replace',
+            action='store_true',
+            help='Replace existing data for the period'
+        )
 
     def handle(self, *args, **kwargs):
-        # Get a list of unique tickers from FinancialData
-        tickers = FinancialReport.objects.values_list('ticker', flat=True).distinct()
+        period = kwargs['period']
+        replace = kwargs['replace']
+
+        # Get list of unique tickers from FinancialData
+        tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
 
         # Initialize progress bar
-        for ticker in tqdm(tickers, desc="Fetching Prices and Market Caps"):
-            try:
-                # Fetch the latest price and market cap using Yahoo Finance API
-                price, market_cap = yahoo_quote_cl(ticker)
+        with tqdm(total=len(tickers), desc="Fetching Historical Data") as pbar:
+            for ticker in tickers:
+                try:
+                    # Fetch historical data
+                    price_data_objects = fetch_stock_data(ticker, period=period)
 
-                # Debug print to see what's fetched
-                print(f"Ticker: {ticker}, Price: {price}, Market Cap: {market_cap}")
+                    if price_data_objects:
+                        with transaction.atomic():
+                            # If replace flag is set, delete existing data for this period
+                            if replace:
+                                earliest_date = min(obj.date for obj in price_data_objects)
+                                latest_date = max(obj.date for obj in price_data_objects)
+                                PriceData.objects.filter(
+                                    ticker=ticker,
+                                    date__range=(earliest_date, latest_date)
+                                ).delete()
 
-                # If the price and market cap are valid, save them to the PriceData model
-                if price is not None and market_cap is not None:
-                    price_data = PriceData(
-                        ticker=ticker,
-                        date=datetime.date.today(),
-                        price=price,
-                        market_cap=market_cap
-                    )
-                    price_data.save()
+                            # Bulk create new records
+                            PriceData.objects.bulk_create(
+                                price_data_objects,
+                                ignore_conflicts=True  # Skip if record already exists
+                            )
 
-                    print(f"Saved price and market cap for {ticker}: {price}, {market_cap} on {datetime.date.today()}")
+                        print(f"Successfully saved {len(price_data_objects)} records for {ticker}")
 
-            except Exception as e:
-                print(f"Error fetching or saving price and market cap for {ticker}: {str(e)}")
+                    # Add small delay to avoid hitting API limits
+                    time.sleep(0.5)
+
+                except Exception as e:
+                    print(f"Error processing {ticker}: {str(e)}")
+
+                finally:
+                    pbar.update(1)
+
+        self.stdout.write(self.style.SUCCESS('Data import completed'))
