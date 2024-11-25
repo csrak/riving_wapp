@@ -194,7 +194,7 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
             print(r, '\n')
         try:
             metrics = dict(completion.choices[0].message.parsed.metrics)
-            print(metrics, '\n') s3 xz
+            print(metrics, '\n')
         except TypeError:
             print("Metrics Missing")
         hist_as_dict = [dict(r) for r in completion.choices[0].message.parsed.historical_changes]

@@ -16,6 +16,7 @@ import unittest
 import logging
 from unittest.mock import patch
 from requests.exceptions import RequestException
+from zipfile import BadZipFile
 import datetime
 # Set up logging for detailed debugging
 logging.basicConfig(level=logging.DEBUG)
@@ -313,17 +314,26 @@ class CmfScraping:
 
     def __init__(self, tickers, month, year):
         """
-        Initializes the CmfScraping class, scrapes company links, and downloads the relevant files using FileDownloader.
+        Initializes the CmfScraping class
         """
         if month not in ['03', '06', '09', '12']:
             raise ValueError("Month must be one of the reporting months: 03, 06, 09, 12")
         self.companies_list = tickers#.get_all_tickers_as_dataframe()
-        self.company_links = self.scrap_company_links(month, year)
+        self.year = year
+        self.month= month
+        self.downloader = FileDownloader(self.root_dir, self.datafold, self.agent)
+        return
+
+    def scrap_all_analysis(self):
+        """
+        Scrapes company links, and downloads the relevant files using FileDownloader.
+        """
+        company_links = self.scrap_company_links(self.month, self.year)
         flinks = []
-        fnames = ['0'] * len(self.company_links)
+        fnames = ['0'] * len(company_links)
 
         # Loop through each company link to scrape file links and set filenames for downloading
-        for i, link in enumerate(self.company_links):
+        for i, link in enumerate(company_links):
             if link == 'Not Found':
                 print(f"Link not found for company index {i}, skipping...")
                 flinks.append('Invalid Link')
@@ -334,18 +344,18 @@ class CmfScraping:
                 file_link = self.scrap_file_links(link)
                 flinks.append(file_link)
                 if file_link != 'Not Found':
-                    fnames[i] = f"{month}-{year}/Analisis_{self.companies_list.loc[i, 'Ticker']}_{month}-{year}.pdf"
+                    fnames[i] = f"{self.month}-{self.year}/Analisis_{self.companies_list.loc[i, 'Ticker']}_{self.month}-{self.year}.pdf"
             except requests.RequestException as e:
                 print(f"Error scraping file link for {link}: {e}")
                 flinks.append('Invalid Link')
 
         # Create directory for storing downloaded data if it doesn't exist
-        folder_data = self.datafold / Path(f"{month}-{year}")
+        folder_data = self.datafold / Path(f"{self.month}-{self.year}")
         print(folder_data)
         os.makedirs(folder_data, exist_ok=True)
 
         # Creates an instance of FileDownloader to handle the downloading of files
-        self.downloader = FileDownloader(self.root_dir, self.datafold, self.agent)
+
         # Uses the FileDownloader instance to download the files whose links were scraped
         self.downloader.download_files(flinks, fnames, update=False)
 
@@ -401,6 +411,118 @@ class CmfScraping:
 
         return 'Not Found'
 
+    def scrap_dividends(
+            self,
+            year_i,
+            year_f=0,
+            series='A',
+            types=[1, 2, 3],
+            to_file=True
+    ):
+        """
+        Scrape dividend information for Chilean companies.
+
+        Args:
+        - year_i: Initial year for dividend retrieval
+        - year_f: Final year (default: current year)
+        - ticker: Optional specific ticker to retrieve
+        - trimester: Specific trimester selection
+        - series: Share series to select
+        - types: Types of dividends to select
+        - to_file: Whether to save results to a file
+
+        Returns:
+        - DataFrame with dividend information
+        """
+        # Determine final year
+        if year_f == 0:
+            year_f = datetime.now().year
+        elif (year_f - year_i) < 0:
+            raise ValueError("Initial year must be before or equal to final year")
+
+
+        # Load registered stocks
+        file_name = 'registered_stocks.csv'
+        df1 = pd.read_csv(self.datafold / file_name)
+        # Prepare lists of tickers and RUTs
+        tickers = self.companies_list['Ticker'].tolist()
+        ruts = self.companies_list['RUT'].tolist()
+
+        # Prepare to collect dividend data
+        final_dataframe = []
+
+        # Iterate through companies
+        for counter, rut in enumerate(ruts):
+            # Skip companies with ERROR in RUT
+            if "ERROR" in rut:
+                continue
+
+            # Construct URL for dividend scraping
+            url = (
+                "https://www.cmfchile.cl/institucional/estadisticas/acc_dividendos1grid.php?"
+                f"lang=es&sociedad%5B%5D={rut[:-2]}&tipodiv=0&mes=0&anno={year_i}&"
+                f"mes2=0&anno2={year_f}&xls=y&semana=&vsn=2"
+            )
+            print(url)
+            logging.info(f"Parsing url for {tickers[counter]}: {url}")
+
+            try:
+                # Fetch dividend data
+                page = requests.get(url, headers=self.agent)
+
+                # Read Excel data
+                df = pd.read_excel(page.content, header=6, engine="openpyxl")
+
+                # Filter by series and dividend types
+                df = df[
+                    (df['Serieafecta'].isin([series, 'U'])) &
+                    (df['Tipodedividendo(1)'].isin(types))
+                    ]
+
+                # Process dividend data
+                df['Year'] = pd.DatetimeIndex(df['Fecha']).year
+                df['Dividends'] = df.iloc[:, 12] * df['Tasadecambio']
+
+                # Aggregate dividends by year
+                df_f = df[['Year', 'Dividends']].groupby(['Year']).sum()
+
+                # Add dividend type counts
+                for typesh in types:
+                    type_column = []
+                    name = f'Type {typesh}'
+                    for real_year in df_f.index:
+                        type_count = df[
+                            (df['Tipodedividendo(1)'] == typesh) &
+                            (df['Year'] == float(real_year))
+                            ].shape[0]
+                        type_column.append(type_count)
+                    df_f[name] = type_column
+
+                # Add ticker column
+                df_f['Ticker'] = [tickers[counter]] * len(df_f)
+
+                final_dataframe.append(df_f)
+
+            except BadZipFile:
+                continue
+
+        # Combine results
+        result = pd.concat(final_dataframe)
+
+        # Save to file if requested
+        if to_file:
+            # Ensure Dividends directory exists
+            dividends_path = self.datafold / 'Dividends'
+            dividends_path.mkdir(parents=True, exist_ok=True)
+
+            # Generate filename
+            file_name = f'Dividends_{ticker}_{year_i}_{year_f}.csv' if ticker else f'Dividends_{year_i}_{year_f}.csv'
+            full_path = dividends_path / file_name
+
+            result.to_csv(full_path, index=True)
+
+        return result
+
 
 class TestCmfScraping(unittest.TestCase):
     #@patch('requests.get')  # Mocking the requests.get call
@@ -451,6 +573,7 @@ if __name__ == "__main__":
         try:
             for i in ['03','06','09','12']:
                 cmf_scraping = CmfScraping(tickers=all_tickers.head(1), month=i, year='2023')
+                cmf_scraping.scrap_all_analysis()
         except ValueError as e:
             logging.error(f"Invalid month provided: {e}")
         except RequestException as e:
