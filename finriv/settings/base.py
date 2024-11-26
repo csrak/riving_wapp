@@ -102,3 +102,10 @@ LOGGING = {
         },
     },
 }
+Q_CLUSTER = {
+    'name': 'DjangoQ',
+    'workers': 4,
+    'timeout': 60,
+    'retry': 120,
+    'orm': 'default',  # Use Django ORM as the broker
+}

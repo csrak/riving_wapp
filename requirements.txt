@@ -20,3 +20,4 @@ yfinance==0.2.42
 django-q
 django_extensions
 gunicorn
+python-decouple
