@@ -22,3 +22,4 @@ django_extensions
 gunicorn
 python-decouple
 psycopg2-binary
+dj_database_url
