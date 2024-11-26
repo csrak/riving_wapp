@@ -3,6 +3,7 @@ from datetime import timedelta
 # Use environment variables for sensitive information
 from decouple import config
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='None')
+import dj_database_url
 
 DEBUG = False
 
@@ -10,14 +11,9 @@ ALLOWED_HOSTS = ['rivingwapp-production.up.railway.app']
 
 # Example: Using PostgreSQL in production
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB"),
-        "USER": os.getenv("POSTGRES_USER"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": os.getenv("POSTGRES_HOST"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-    }
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL', default='sqlite:///db.sqlite3')
+    )
 }
 
 # Security settings
