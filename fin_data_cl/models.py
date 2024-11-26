@@ -125,7 +125,7 @@ class FinancialRatio(models.Model):
         unique_together = ('ticker', 'date')
         verbose_name = 'Financial Ratio'
         verbose_name_plural = 'Financial Ratios'
-class DividendSummary(models.Model):
+class DividendSummary(models.Model): #Deprecated
     ticker = models.CharField(max_length=10)
     year = models.IntegerField()
     total_dividends = models.DecimalField(max_digits=20, decimal_places=2)
@@ -138,3 +138,17 @@ class DividendSummary(models.Model):
         get_latest_by = 'year'  # Add this line
     def __str__(self):
         return f"{self.ticker} - {self.year}"
+
+class Dividend(models.Model):
+    """
+    Comprehensive model to store detailed dividend history
+    with methods for aggregation and summary retrieval
+    """
+    ticker = models.CharField(max_length=10, db_index=True)
+    date = models.DateField(db_index=True)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    dividend_type = models.IntegerField(choices=[
+        (1, 'Type 1'),
+        (2, 'Type 2'),
+        (3, 'Type 3')
+    ])

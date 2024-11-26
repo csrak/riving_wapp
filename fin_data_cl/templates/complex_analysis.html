@@ -169,48 +169,58 @@
             }
 
             // Function to enable sorting on the table columns with visual indicators
-            function enableSorting() {
-                let sortedColumn = null;  // Track which column is currently sorted
-                let sortOrder = 'asc';  // Default sort order
+function enableSorting() {
+        let sortedColumn = null;  // Track which column is currently sorted
+        let sortOrder = 'asc';  // Default sort order
 
-                // Event handler for clicking on sortable headers
-                $('.sortable').off('click').on('click', function() {
-                    const ratio = $(this).data('ratio');
+        // Event handler for clicking on sortable headers
+        $('.sortable').off('click').on('click', function() {
+            const ratio = $(this).data('ratio');
 
-                    // Toggle sort order if the same column is clicked
-                    if (sortedColumn === ratio) {
-                        sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-                    } else {
-                        sortedColumn = ratio;
-                        sortOrder = 'asc';  // Reset to ascending if a new column is clicked
-                    }
-
-                    // Remove sorting indicators from all headers
-                    $('.sortable').removeClass('sort-asc sort-desc');
-
-                    // Add sorting indicator to the currently sorted column
-                    if (sortOrder === 'asc') {
-                        $(this).addClass('sort-asc');
-                    } else {
-                        $(this).addClass('sort-desc');
-                    }
-
-                    // Sort the data
-                    const sortedData = [...originalData].sort((a, b) => {
-                        const A = a[ratio] !== undefined && !isNaN(a[ratio]) ? parseFloat(a[ratio]) : a[ratio];
-                        const B = b[ratio] !== undefined && !isNaN(b[ratio]) ? parseFloat(b[ratio]) : b[ratio];
-
-                        if (typeof A === 'string' && typeof B === 'string') {
-                            return sortOrder === 'asc' ? A.localeCompare(B) : B.localeCompare(A);
-                        } else {
-                            return sortOrder === 'asc' ? A - B : B - A;
-                        }
-                    });
-
-                    // Re-render the table with the sorted data
-                    renderTable(sortedData);
-                });
+            // Toggle sort order if the same column is clicked
+            if (sortedColumn === ratio) {
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortedColumn = ratio;
+                sortOrder = 'asc';  // Reset to ascending if a new column is clicked
             }
+
+            // Remove sorting indicators from all headers
+            $('.sortable').removeClass('sort-asc sort-desc');
+
+            // Add sorting indicator to the currently sorted column
+            if (sortOrder === 'asc') {
+                $(this).addClass('sort-asc');
+            } else {
+                $(this).addClass('sort-desc');
+            }
+            console.log('Sorting by column:', ratio);
+            console.log('Original data before sorting:', originalData);
+            const sortedData = [...originalData].sort((a, b) => {
+                if (ratio === 'ticker') {
+                    return sortOrder === 'asc' ? a[ratio].localeCompare(b[ratio]) : b[ratio].localeCompare(a[ratio]);
+                } else if (ratio === 'date') {
+                    const dateA = new Date(a[ratio]);
+                    const dateB = new Date(b[ratio]);
+                    return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                } else {
+                    const A = parseFloat(a[ratio]);
+                    const B = parseFloat(b[ratio]);
+
+                    // Handle non-numeric values correctly
+                    if (isNaN(A) && isNaN(B)) return 0;
+                    if (isNaN(A)) return 1;
+                    if (isNaN(B)) return -1;
+
+                    return sortOrder === 'asc' ? A - B : B - A;
+                }
+            });
+
+            // Re-render the table with the sorted data
+            console.log('Sorted data:', sortedData);
+            renderTable(sortedData);
+        });
+    }
 
             // Initialize sorting functionality when the page loads
             enableSorting();

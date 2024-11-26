@@ -312,23 +312,22 @@ class CmfScraping:
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36"
     }
 
-    def __init__(self, tickers, month, year):
+    def __init__(self, tickers):
         """
         Initializes the CmfScraping class
         """
-        if month not in ['03', '06', '09', '12']:
-            raise ValueError("Month must be one of the reporting months: 03, 06, 09, 12")
+
         self.companies_list = tickers#.get_all_tickers_as_dataframe()
-        self.year = year
-        self.month= month
         self.downloader = FileDownloader(self.root_dir, self.datafold, self.agent)
         return
 
-    def scrap_all_analysis(self):
+    def scrap_all_analysis(self, month, year):
         """
         Scrapes company links, and downloads the relevant files using FileDownloader.
         """
-        company_links = self.scrap_company_links(self.month, self.year)
+        if month not in ['03', '06', '09', '12']:
+            raise ValueError("Month must be one of the reporting months: 03, 06, 09, 12")
+        company_links = self.scrap_company_links(month, year)
         flinks = []
         fnames = ['0'] * len(company_links)
 
@@ -344,13 +343,13 @@ class CmfScraping:
                 file_link = self.scrap_file_links(link)
                 flinks.append(file_link)
                 if file_link != 'Not Found':
-                    fnames[i] = f"{self.month}-{self.year}/Analisis_{self.companies_list.loc[i, 'Ticker']}_{self.month}-{self.year}.pdf"
+                    fnames[i] = f"{month}-{year}/Analisis_{self.companies_list.loc[i, 'Ticker']}_{month}-{year}.pdf"
             except requests.RequestException as e:
                 print(f"Error scraping file link for {link}: {e}")
                 flinks.append('Invalid Link')
 
         # Create directory for storing downloaded data if it doesn't exist
-        folder_data = self.datafold / Path(f"{self.month}-{self.year}")
+        folder_data = self.datafold / Path(f"{month}-{year}")
         print(folder_data)
         os.makedirs(folder_data, exist_ok=True)
 
@@ -415,24 +414,20 @@ class CmfScraping:
             self,
             year_i,
             year_f=0,
-            series='A',
             types=[1, 2, 3],
             to_file=True
     ):
         """
-        Scrape dividend information for Chilean companies.
+        Scrape comprehensive dividend information for Chilean companies.
 
         Args:
         - year_i: Initial year for dividend retrieval
         - year_f: Final year (default: current year)
-        - ticker: Optional specific ticker to retrieve
-        - trimester: Specific trimester selection
-        - series: Share series to select
         - types: Types of dividends to select
         - to_file: Whether to save results to a file
 
         Returns:
-        - DataFrame with dividend information
+        - DataFrame with detailed dividend information
         """
         # Determine final year
         if year_f == 0:
@@ -440,10 +435,10 @@ class CmfScraping:
         elif (year_f - year_i) < 0:
             raise ValueError("Initial year must be before or equal to final year")
 
-
         # Load registered stocks
         file_name = 'registered_stocks.csv'
         df1 = pd.read_csv(self.datafold / file_name)
+
         # Prepare lists of tickers and RUTs
         tickers = self.companies_list['Ticker'].tolist()
         ruts = self.companies_list['RUT'].tolist()
@@ -457,6 +452,18 @@ class CmfScraping:
             if "ERROR" in rut:
                 continue
 
+            ticker = tickers[counter]
+
+            # Determine series based on ticker naming convention
+            if '-A' in ticker:
+                series = 'A'
+            elif '-B' in ticker:
+                series = 'B'
+            elif '-C' in ticker:
+                series = 'C'
+            else:
+                series = 'U'  # Universal/default series
+
             # Construct URL for dividend scraping
             url = (
                 "https://www.cmfchile.cl/institucional/estadisticas/acc_dividendos1grid.php?"
@@ -464,7 +471,7 @@ class CmfScraping:
                 f"mes2=0&anno2={year_f}&xls=y&semana=&vsn=2"
             )
             print(url)
-            logging.info(f"Parsing url for {tickers[counter]}: {url}")
+            logging.info(f"Parsing url for {ticker}: {url}")
 
             try:
                 # Fetch dividend data
@@ -479,35 +486,41 @@ class CmfScraping:
                     (df['Tipodedividendo(1)'].isin(types))
                     ]
 
-                # Process dividend data
-                df['Year'] = pd.DatetimeIndex(df['Fecha']).year
-                df['Dividends'] = df.iloc[:, 12] * df['Tasadecambio']
+                # Ensure date is properly parsed
+                df['Date'] = pd.to_datetime(df['Fecha'], infer_datetime_format=True)
 
-                # Aggregate dividends by year
-                df_f = df[['Year', 'Dividends']].groupby(['Year']).sum()
+                # Calculate dividends with exchange rate
+                df['Dividend'] = df.iloc[:, 12] * df['Tasadecambio']
 
-                # Add dividend type counts
-                for typesh in types:
-                    type_column = []
-                    name = f'Type {typesh}'
-                    for real_year in df_f.index:
-                        type_count = df[
-                            (df['Tipodedividendo(1)'] == typesh) &
-                            (df['Year'] == float(real_year))
-                            ].shape[0]
-                        type_column.append(type_count)
-                    df_f[name] = type_column
+                # Add additional columns for tracking
+                df['Ticker'] = ticker
+                df['Series'] = series
 
-                # Add ticker column
-                df_f['Ticker'] = [tickers[counter]] * len(df_f)
+                # Select and rename relevant columns
+                dividend_df = df[['Date', 'Dividend', 'Ticker', 'Series', 'Tipodedividendo(1)']]
+                dividend_df.columns = ['Date', 'Dividend', 'Ticker', 'Series', 'DividendType']
 
-                final_dataframe.append(df_f)
+                final_dataframe.append(dividend_df)
 
             except BadZipFile:
+                logging.warning(f"Bad zip file for {ticker}")
+                continue
+            except Exception as e:
+                logging.error(f"Error processing {ticker}: {e}")
                 continue
 
         # Combine results
-        result = pd.concat(final_dataframe)
+        try:
+            result = pd.concat(final_dataframe)
+
+            # Sort by date for better readability
+            result = result.sort_values('Date')
+
+            # Reset index for clean output
+            result = result.reset_index(drop=True)
+        except ValueError:
+            print("No data found in range, please check.")
+            return None
 
         # Save to file if requested
         if to_file:
@@ -516,10 +529,10 @@ class CmfScraping:
             dividends_path.mkdir(parents=True, exist_ok=True)
 
             # Generate filename
-            file_name = f'Dividends_{ticker}_{year_i}_{year_f}.csv' if ticker else f'Dividends_{year_i}_{year_f}.csv'
+            file_name = f'Dividends_{year_i}_{year_f}.csv'
             full_path = dividends_path / file_name
 
-            result.to_csv(full_path, index=True)
+            result.to_csv(full_path, index=False)
 
         return result
 
@@ -569,11 +582,11 @@ if __name__ == "__main__":
         logging.debug(f"Successfully retrieved tickers: {all_tickers.head()}")
     except Exception as e:
         logging.error(f"Error retrieving tickers: {e}")
+    cmf_scraping = CmfScraping(tickers=all_tickers.head(1))
     for year in range(start_year, end_year + 1):
         try:
             for i in ['03','06','09','12']:
-                cmf_scraping = CmfScraping(tickers=all_tickers.head(1), month=i, year='2023')
-                cmf_scraping.scrap_all_analysis()
+                cmf_scraping.scrap_all_analysis(month=i, year='2023')
         except ValueError as e:
             logging.error(f"Invalid month provided: {e}")
         except RequestException as e:

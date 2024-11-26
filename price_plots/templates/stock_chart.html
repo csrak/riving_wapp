@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Stock Chart - {{ selected_ticker }}{% endblock %}
+{% block title %}Stock Chart with Dividends - {{ selected_ticker }}{% endblock %}
 
 {% block content %}
 <div class="bg-white rounded-lg shadow-lg p-6">
@@ -41,6 +41,8 @@
     <!-- Chart Container -->
     {% if plot_div %}
         <div class="mt-4">
+            <h3 class="text-lg font-medium text-gray-800">Stock Chart with Dividends for {{ selected_ticker }}</h3>
+            <p class="text-gray-500 mb-4">The chart below shows the stock price along with dividends, represented on a secondary y-axis.</p>
             {{ plot_div|safe }}
         </div>
     {% elif not messages %}

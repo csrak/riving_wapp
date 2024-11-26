@@ -1,48 +1,59 @@
 import math
 from django.core.management.base import BaseCommand
-from fin_data_cl.models import FinancialData, FinancialRatio, PriceData, DividendSummary, FinancialReport
+from fin_data_cl.models import FinancialData, FinancialRatio, PriceData, Dividend, FinancialReport
 from decimal import Decimal
 import datetime
+from datetime import date, timedelta
+from django.db.models import Sum, Max
 
-def get_latest_dividend_total(ticker):
+def get_latest_dividend_total(ticker, last_update_date):
     """
-    Retrieves the total dividends for the latest year for a given ticker using the latest() method.
+    Calculate the total dividend paid for the given ticker in the last 365 days
+    since the last update in the Dividend model, and in the 365 days before that.
+    Returns None on each if there is insufficient data.
 
     Args:
-        ticker (str): The ticker symbol of the company.
+        ticker (str): The ticker symbol for the company
 
     Returns:
-        dict: A dictionary containing 'ticker', 'year', 'total_dividends', and 'dividend_count'.
-              Returns None if no records are found for the ticker.
+        tuple: (total_last_365_days, total_previous_365_days)
     """
-    latest_dividend = DividendSummary.objects.filter(ticker=ticker.upper()).latest()
+    # Get the most recent date from the Dividend model for the given ticker, this is not exactly latest day downloaded but still valid
 
-    if latest_dividend:
-        return {
-            'ticker': latest_dividend.ticker,
-            'year': latest_dividend.year,
-            'total_dividends': latest_dividend.total_dividends,
-            'dividend_count': latest_dividend.dividend_count
-        }
-    else:
-        print(f"Dividends not found for {ticker}")
-        return None
+
+    # Define the date ranges based on the last update date
+    last_year_end = last_update_date
+    last_year_start = last_update_date - timedelta(days=365)
+
+    previous_year_end = last_year_start - timedelta(days=1)
+    previous_year_start = previous_year_end - timedelta(days=365)
+
+    # Calculate the total dividend for the last 365 days since the last update
+    total_last_365_days = (
+        Dividend.objects.filter(
+            ticker=ticker,
+            date__range=(last_year_start, last_year_end)
+        ).aggregate(total=Sum('amount'))['total']
+    )
+
+    # Calculate the total dividend for the 365 days before the last year
+    total_previous_365_days = (
+        Dividend.objects.filter(
+            ticker=ticker,
+            date__range=(previous_year_start, previous_year_end)
+        ).aggregate(total=Sum('amount'))['total']
+    )
+
+    return total_last_365_days, total_previous_365_days
 def calculate_ratios(ticker, date):
     # try:
+    last_div_update_date = Dividend.objects.aggregate(max_date=Max('date'))['max_date']
 
     # Get the latest available date for balance sheet data
     latest_financial_data = FinancialData.objects.filter(ticker=ticker, date=date).first()
     try:
-        latest_divs = get_latest_dividend_total(ticker)
-        div_year = latest_divs["year"]  # In case we have no dates for the normal fin data
-        latest_divs = latest_divs['total_dividends']
-        before_divs = DividendSummary.objects.filter(ticker=ticker.upper()).order_by('-year')[:2]
-        if len(before_divs) >= 2:
-            before_divs = before_divs[1].total_dividends
-        else:
-            before_divs = None
+        latest_divs, before_divs = get_latest_dividend_total(ticker,last_div_update_date)
     except Exception as e:
-        latest_divs = None
         div_year = None
         latest_divs = None
         before_divs = None
@@ -139,11 +150,11 @@ def calculate_ratios(ticker, date):
         current_ratio = to_decimal(balance_sheet_data['current_assets'] / balance_sheet_data['current_liabilities']) if (balance_sheet_data['current_liabilities'] and balance_sheet_data['current_assets']) else None
         quick_ratio = to_decimal((balance_sheet_data['current_assets'] - balance_sheet_data['inventories']) / balance_sheet_data['current_liabilities']) if (balance_sheet_data['current_liabilities'] and balance_sheet_data['current_assets'] and balance_sheet_data['inventories']) else None
 
-        dividend_yield = to_decimal(latest_divs / price_data.price)  if latest_divs else None
-        before_dividend_yield = to_decimal(before_divs) / price_data.price  if before_divs else None
+        dividend_yield = to_decimal(latest_divs / price_data.price *100)  if latest_divs else None
+        before_dividend_yield = to_decimal(before_divs/ price_data.price*100)  if before_divs else None
     # Create or update the financial ratio record
     if date is None:
-        date = datetime.date(int(div_year), 1, 1)
+        date = last_div_update_date
 
     financial_ratio, created = FinancialRatio.objects.update_or_create(
         ticker=ticker,

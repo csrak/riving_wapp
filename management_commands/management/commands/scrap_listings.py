@@ -53,16 +53,16 @@ class Command(BaseCommand):
             logging.debug(f"Successfully retrieved tickers: {all_tickers.head()}")
         except Exception as e:
             logging.error(f"Error retrieving tickers: {e}")
-        for year in range(start_year, end_year + 1):
-            try:
-                for i in ['03','06','09','12']:
-                    cmf_scraping = CmfScraping(tickers=all_tickers, month=i, year=str(year))
-                    if analysis:
-                        cmf_scraping.scrap_all_analysis()
-            except ValueError as e:
-                logging.error(f"Invalid month provided: {e}")
-            except RequestException as e:
-                logging.error(f"Failed to scrape links: {e}")
+        cmf_scraping = CmfScraping(tickers=all_tickers)
+        if analysis:
+            for year in range(start_year, end_year + 1):
+                try:
+                    for i in ['03','06','09','12']:
+                        cmf_scraping.scrap_all_analysis(month=i, year=str(year))
+                except ValueError as e:
+                    logging.error(f"Invalid month provided: {e}")
+                except RequestException as e:
+                    logging.error(f"Failed to scrape links: {e}")
         if dividends:
             cmf_scraping.scrap_dividends(start_year,end_year)
 

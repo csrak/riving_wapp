@@ -2,10 +2,10 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from django.db.models import QuerySet
 import numpy as np
-from fin_data_cl.models import PriceData
+from fin_data_cl.models import PriceData, Dividend
 
 
 class StockVisualizer:
@@ -13,12 +13,13 @@ class StockVisualizer:
         self.ticker = ticker
         self.figure = None
         self.price_data = None
+        self.dividend_data = None
         self.errors = []
 
     def load_data(self, start_date: Optional[datetime] = None,
                   end_date: Optional[datetime] = None) -> bool:
         """
-        Load price data from Django model into pandas DataFrame.
+        Load price and dividend data from Django models into pandas DataFrames.
         Returns True if data was loaded successfully, False otherwise.
         """
         try:
@@ -27,45 +28,49 @@ class StockVisualizer:
             if not start_date:
                 start_date = end_date - timedelta(days=180)
 
-            queryset = PriceData.objects.filter(
+            # Load price data
+            price_queryset = PriceData.objects.filter(
                 ticker=self.ticker,
                 date__range=(start_date, end_date)
             ).order_by('date')
 
-            if not queryset.exists():
-                self.errors.append(f"No data found for ticker {self.ticker} in the specified date range")
+            if not price_queryset.exists():
+                self.errors.append(f"No price data found for ticker {self.ticker} in the specified date range")
                 return False
 
             # Convert queryset to DataFrame
             self.price_data = pd.DataFrame.from_records(
-                queryset.values('date', 'open_price', 'high_price',
-                                'low_price', 'close_price', 'volume')
+                price_queryset.values('date', 'open_price', 'high_price',
+                                      'low_price', 'close_price', 'volume')
             )
 
-            # Clean the data
-            # Replace None/NULL values with NaN for proper handling
+            # Clean the price data
             self.price_data = self.price_data.replace([None], np.nan)
-
-            # Check for missing or invalid values
             required_columns = ['open_price', 'high_price', 'low_price', 'close_price']
             missing_data = self.price_data[required_columns].isnull().any()
 
             if missing_data.any():
                 missing_cols = missing_data[missing_data].index.tolist()
                 self.errors.append(f"Missing values found in columns: {', '.join(missing_cols)}")
-
-                # Forward fill missing values
-                self.price_data = self.price_data.fillna(method='ffill')
-                # Backward fill any remaining NaN values at the beginning
-                self.price_data = self.price_data.fillna(method='bfill')
+                self.price_data = self.price_data.fillna(method='ffill').fillna(method='bfill')
 
             # Validate price relationships
             invalid_highs = self.price_data[self.price_data['high_price'] < self.price_data['low_price']]
             if not invalid_highs.empty:
                 self.errors.append(f"Found {len(invalid_highs)} records where high price is less than low price")
-                # Fix by swapping high and low prices
                 self.price_data.loc[invalid_highs.index, ['high_price', 'low_price']] = \
                     self.price_data.loc[invalid_highs.index, ['low_price', 'high_price']].values
+
+            # Load dividend data
+            dividend_queryset = Dividend.objects.filter(
+                ticker=self.ticker,
+                date__range=(start_date, end_date)
+            ).order_by('date')
+
+            if dividend_queryset.exists():
+                self.dividend_data = pd.DataFrame.from_records(
+                    dividend_queryset.values('date', 'amount', 'dividend_type')
+                )
 
             return True
 
@@ -79,6 +84,7 @@ class StockVisualizer:
                                   title: Optional[str] = None) -> Optional[go.Figure]:
         """
         Create interactive candlestick chart with optional volume subplot.
+        Include dividends as markers with their own y-axis.
         Returns None if data is not available or invalid.
         """
         if self.price_data is None or self.price_data.empty:
@@ -86,13 +92,14 @@ class StockVisualizer:
             return None
 
         try:
-            # Create figure with secondary y-axis for volume
+            # Create figure with secondary y-axis for volume and dividends
             fig = make_subplots(
                 rows=2 if show_volume else 1,
                 cols=1,
                 row_heights=[0.7, 0.3] if show_volume else [1],
                 vertical_spacing=0.05,
-                shared_xaxes=True
+                shared_xaxes=True,
+                specs=[[{"secondary_y": True}], [{"secondary_y": False}]] if show_volume else [[{"secondary_y": True}]]
             )
 
             # Add candlestick trace
@@ -128,13 +135,34 @@ class StockVisualizer:
                     row=2, col=1
                 )
 
+            # Add dividend markers as semi-transparent bars
+            if self.dividend_data is not None and not self.dividend_data.empty:
+                dividend_colors = {1: 'rgba(0, 0, 255, 0.5)', 2: 'rgba(255, 165, 0, 0.5)', 3: 'rgba(128, 0, 128, 0.5)'}
+                for dividend_type, color in dividend_colors.items():
+                    filtered_data = self.dividend_data[self.dividend_data['dividend_type'] == dividend_type]
+                    if not filtered_data.empty:
+                        fig.add_trace(
+                            go.Bar(
+                                x=filtered_data['date'],
+                                y=filtered_data['amount'],
+                                name=f'Dividend Type {dividend_type}',
+                                marker=dict(color=color),
+                                opacity=0.7,
+                                yaxis='y2'
+                            ),
+                            row=1, col=1,
+                            secondary_y=True
+                        )
+
             # Update layout
             fig.update_layout(
-                title=title or f'{self.ticker} Stock Price',
+                title=title or f'{self.ticker} Stock Price with Dividends',
                 height=height,
                 xaxis_rangeslider_visible=False,
-                template='plotly_dark',
-                showlegend=True
+                template='plotly_white',
+                showlegend=True,
+                yaxis_title='Price',
+                yaxis2_title='Dividend Amount'
             )
 
             self.figure = fig
