@@ -38,17 +38,18 @@ def fetch_stock_data(ticker, period="1mo"):
 
         # Process each day's data
         for date, row in hist.iterrows():
+            # Ensure all values are valid before creating the object
             price_data = PriceData(
                 ticker=ticker,
                 date=date.date(),
-                price=to_decimal(row.get('Close')),  # Using Close as the main price
+                price=to_decimal(row.get('Close')) or Decimal(0),  # Default to 0 if invalid
                 market_cap=market_cap,
                 open_price=to_decimal(row.get('Open')),
                 high_price=to_decimal(row.get('High')),
                 low_price=to_decimal(row.get('Low')),
                 close_price=to_decimal(row.get('Close')),
-                adj_close=to_decimal(row.get('Close')),  # Using Close as Adj Close if not available
-                volume=row.get('Volume')
+                adj_close=to_decimal(row.get('Close')),
+                volume=row.get('Volume') or 0  # Default to 0 if volume is missing
             )
             price_data_objects.append(price_data)
 
@@ -81,6 +82,9 @@ class Command(BaseCommand):
 
         # Get list of unique tickers from FinancialData
         tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
+        if replace:
+            PriceData.objects.all().delete()
+            print("All existing PriceData entries have been deleted.")
 
         # Initialize progress bar
         with tqdm(total=len(tickers), desc="Fetching Historical Data") as pbar:

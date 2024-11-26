@@ -8,11 +8,11 @@ import dj_database_url
 DEBUG = False
 
 ALLOWED_HOSTS = ['rivingwapp-production.up.railway.app']
-
+CSRF_TRUSTED_ORIGINS = ['https://rivingwapp-production.up.railway.app']
 # Example: Using PostgreSQL in production
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL', default='sqlite:///db.sqlite3')
+        default=config('DATABASE_URL', default='sqlite:///db.sqlite3'), conn_max_age=600, ssl_require=True
     )
 }
 
