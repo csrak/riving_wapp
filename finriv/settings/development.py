@@ -1,5 +1,5 @@
 from .base import *
-
+from datetime import timedelta
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-q(f&!^own^%p_a2_gt)ekepz$jj(axiv*3ba8@cwz2^p*0$a1o"
 
