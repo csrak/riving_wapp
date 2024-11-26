@@ -15,7 +15,7 @@ DATABASES = {
         default=config('DATABASE_URL', default='sqlite:///db.sqlite3'), conn_max_age=600, ssl_require=True
     )
 }
-
+PORT = int(config('PORT',  default=8080))
 # Security settings
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
