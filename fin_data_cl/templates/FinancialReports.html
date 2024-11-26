@@ -54,7 +54,7 @@
                             <div class="accordion-body">
                                 {% for risk in report_left.risks %}
                                     {% if risk.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ risk.description }}</p>
+                                        <p><strong>Description:</strong> {{ risk.description|format_subsection|safe  }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -73,7 +73,7 @@
                             <div class="accordion-body">
                                 {% for change in report_left.historical_changes %}
                                     {% if change.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ change.description }}</p>
+                                        <p><strong>Description:</strong> {{ change.description|format_subsection|safe  }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -92,7 +92,7 @@
                             <div class="accordion-body">
                                 {% for outlook in report_left.future_outlook %}
                                     {% if outlook.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ outlook.description }}</p>
+                                        <p><strong>Description:</strong> {{ outlook.description |format_subsection|safe }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -141,7 +141,7 @@
                         </h2>
                         <div id="collapseOverviewRight" class="accordion-collapse collapse show" aria-labelledby="headingOverviewRight" data-bs-parent="#financialReportAccordionRight">
                             <div class="accordion-body">
-                                <p>{{ report_right.business_overview }}</p>
+                                <p>{{ report_right.business_overview |format_subsection|safe }}</p>
                             </div>
                         </div>
                     </div>
@@ -157,7 +157,7 @@
                             <div class="accordion-body">
                                 {% for risk in report_right.risks %}
                                     {% if risk.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ risk.description }}</p>
+                                        <p><strong>Description:</strong> {{ risk.description |format_subsection|safe }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -176,7 +176,7 @@
                             <div class="accordion-body">
                                 {% for change in report_right.historical_changes %}
                                     {% if change.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ change.description }}</p>
+                                        <p><strong>Description:</strong> {{ change.description |format_subsection|safe }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
@@ -195,7 +195,7 @@
                             <div class="accordion-body">
                                 {% for outlook in report_right.future_outlook %}
                                     {% if outlook.description|wordcount >= 10 %}
-                                        <p><strong>Description:</strong> {{ outlook.description }}</p>
+                                        <p><strong>Description:</strong> {{ outlook.description |format_subsection|safe }}</p>
                                         <hr>
                                     {% endif %}
                                 {% endfor %}
