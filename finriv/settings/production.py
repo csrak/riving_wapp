@@ -23,16 +23,17 @@ SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-# Celery (Optional in production)
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
-
-CELERY_BEAT_SCHEDULE = {
-    'process_data_and_ratios_every_day': {
-        'task': 'myapp.tasks.process_data_and_ratios',
-        'schedule': timedelta(days=1),
-    },
-}
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# # Celery (Optional in production)
+# CELERY_BROKER_URL = 'redis://redis:6379/0'
+# CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+# CELERY_ACCEPT_CONTENT = ['json']
+# CELERY_TASK_SERIALIZER = 'json'
+# CELERY_TIMEZONE = 'UTC'
+#
+# CELERY_BEAT_SCHEDULE = {
+#     'process_data_and_ratios_every_day': {
+#         'task': 'myapp.tasks.process_data_and_ratios',
+#         'schedule': timedelta(days=1),
+#     },
+# }
