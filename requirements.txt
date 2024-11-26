@@ -19,3 +19,4 @@ Unidecode==1.2.0
 yfinance==0.2.42
 django-q
 django_extensions
+gunicorn
