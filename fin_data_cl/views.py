@@ -119,6 +119,11 @@ def search_financial_report(request):
                 except FinancialReport.DoesNotExist:
                     report_left = None
 
+                # Store the current values in session
+                request.session['left-ticker'] = ticker
+                request.session['left-year'] = year
+                request.session['left-month'] = month
+
         elif form_id == 'right':
             form_right = FinancialReportSearchForm(request.POST, prefix='right')
             if form_right.is_valid():
@@ -134,49 +139,43 @@ def search_financial_report(request):
                 except FinancialReport.DoesNotExist:
                     report_right = None
 
-        # Reinitialize the other form if it wasn't submitted
-        if form_id == 'left':
-            if 'right-ticker' in request.session:
-                initial_right = {
-                    'ticker': request.session['right-ticker'],
-                    'year': request.session['right-year'],
-                    'month': request.session['right-month']
-                }
-                form_right = FinancialReportSearchForm(initial=initial_right, prefix='right')
-                try:
-                    report_right = FinancialReport.objects.get(
-                        ticker=initial_right['ticker'],
-                        year=initial_right['year'],
-                        month=initial_right['month']
-                    )
-                except FinancialReport.DoesNotExist:
-                    report_right = None
-        else:
-            if 'left-ticker' in request.session:
-                initial_left = {
-                    'ticker': request.session['left-ticker'],
-                    'year': request.session['left-year'],
-                    'month': request.session['left-month']
-                }
-                form_left = FinancialReportSearchForm(initial=initial_left, prefix='left')
-                try:
-                    report_left = FinancialReport.objects.get(
-                        ticker=initial_left['ticker'],
-                        year=initial_left['year'],
-                        month=initial_left['month']
-                    )
-                except FinancialReport.DoesNotExist:
-                    report_left = None
+                # Store the current values in session
+                request.session['right-ticker'] = ticker
+                request.session['right-year'] = year
+                request.session['right-month'] = month
 
-        # Store the current values in session
-        if form_id == 'left' and form_left.is_valid():
-            request.session['left-ticker'] = form_left.cleaned_data['ticker']
-            request.session['left-year'] = form_left.cleaned_data['year']
-            request.session['left-month'] = form_left.cleaned_data['month']
-        elif form_id == 'right' and form_right.is_valid():
-            request.session['right-ticker'] = form_right.cleaned_data['ticker']
-            request.session['right-year'] = form_right.cleaned_data['year']
-            request.session['right-month'] = form_right.cleaned_data['month']
+    # Reinitialize forms with session data if available
+    if 'left-ticker' in request.session:
+        initial_left = {
+            'ticker': request.session['left-ticker'],
+            'year': request.session['left-year'],
+            'month': request.session['left-month']
+        }
+        form_left = FinancialReportSearchForm(initial=initial_left, prefix='left')
+        try:
+            report_left = FinancialReport.objects.get(
+                ticker=initial_left['ticker'],
+                year=initial_left['year'],
+                month=initial_left['month']
+            )
+        except FinancialReport.DoesNotExist:
+            report_left = None
+
+    if 'right-ticker' in request.session:
+        initial_right = {
+            'ticker': request.session['right-ticker'],
+            'year': request.session['right-year'],
+            'month': request.session['right-month']
+        }
+        form_right = FinancialReportSearchForm(initial=initial_right, prefix='right')
+        try:
+            report_right = FinancialReport.objects.get(
+                ticker=initial_right['ticker'],
+                year=initial_right['year'],
+                month=initial_right['month']
+            )
+        except FinancialReport.DoesNotExist:
+            report_right = None
 
     context = {
         'form_left': form_left,
@@ -185,6 +184,7 @@ def search_financial_report(request):
         'report_right': report_right
     }
     return render(request, 'FinancialReports.html', context)
+
 def screener(request):
     return render(request, 'complex_analysis.html')
 
