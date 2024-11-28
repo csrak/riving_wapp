@@ -100,7 +100,7 @@
                         </div>
                     </div>
                 </div>
-            {% elif report_left is not none %}
+            {% else %}
                 <div class="alert alert-warning mt-4" role="alert">
                     No financial report found for the selected ticker and date.
                 </div>
@@ -203,7 +203,7 @@
                         </div>
                     </div>
                 </div>
-            {% elif report_right is not none %}
+            {% else %}
                 <div class="alert alert-warning mt-4" role="alert">
                     No financial report found for the selected ticker and date.
                 </div>

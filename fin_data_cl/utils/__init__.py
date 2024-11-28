@@ -1,0 +1,1 @@
+from .report_requests import generalized_search_view
