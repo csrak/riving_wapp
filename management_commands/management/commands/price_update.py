@@ -1,124 +1,163 @@
 import time
-import pandas as pd
-from tqdm import tqdm
-from django.core.management.base import BaseCommand
-from fin_data_cl.models import PriceData, FinancialData
-import datetime
+import yfinance as yf
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-import yfinance as yf  # Yahoo Finance API
+from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
+import logging
+from typing import Optional, List, Dict
+from fin_data_cl.models import Exchange, Security, PriceData
 
-# Function to ensure values are compatible with Django DecimalField
-def to_decimal(value):
-    try:
-        return Decimal(str(value)) if value is not None else None
-    except (InvalidOperation, ValueError):
-        return None
+logger = logging.getLogger(__name__)
 
 
-def fetch_stock_data(ticker, period="1mo"):
-    """
-    Fetch historical stock data for a given ticker
-    Returns a list of PriceData objects
-    """
-    ticker_sn = ticker + '.SN'
-    price_data_objects = []
+class PriceDataFetcher:
+    """Handles fetching and processing of price data from Yahoo Finance"""
 
-    try:
-        stock = yf.Ticker(ticker_sn)
-        hist = stock.history(period=period)
+    def __init__(self, exchange: Exchange):
+        self.exchange = exchange
 
-        if hist.empty:
-            print(f"Warning: No data returned for ticker {ticker_sn}")
-            return []
+    def to_decimal(self, value) -> Optional[Decimal]:
+        """Convert value to Decimal, handling None and invalid values"""
+        try:
+            return Decimal(str(value)) if value is not None else None
+        except (InvalidOperation, ValueError):
+            return None
 
-        # Get market cap from stock info
-        stock_info = stock.info
-        market_cap = to_decimal(stock_info.get('marketCap'))
+    def fetch_data(self, security: Security) -> List[Dict]:
+        """
+        Fetch price data for a single security starting from the appropriate date
+        """
+        price_data_list = []
+        full_symbol = f"{security.ticker}.{self.exchange.suffix}"
 
-        # Process each day's data
-        for date, row in hist.iterrows():
-            # Ensure all values are valid before creating the object
-            price_data = PriceData(
-                ticker=ticker,
-                date=date.date(),
-                price=to_decimal(row.get('Close')) or Decimal(0),  # Default to 0 if invalid
-                market_cap=market_cap,
-                open_price=to_decimal(row.get('Open')),
-                high_price=to_decimal(row.get('High')),
-                low_price=to_decimal(row.get('Low')),
-                close_price=to_decimal(row.get('Close')),
-                adj_close=to_decimal(row.get('Close')),
-                volume=row.get('Volume') or 0  # Default to 0 if volume is missing
+        try:
+            # Determine the start date
+            start_date = PriceData.get_start_date(security)
+            today = timezone.now().date()
+
+            if start_date >= today:
+                logger.info(f"Data already up to date for {full_symbol}")
+                return []
+
+            logger.info(
+                f"Fetching {full_symbol} data from {start_date} to {today}"
             )
-            price_data_objects.append(price_data)
 
-        return price_data_objects
+            # Fetch data from Yahoo Finance
+            stock = yf.Ticker(full_symbol)
+            hist = stock.history(
+                start=start_date,
+                end=today + timedelta(days=1)  # Include today
+            )
 
-    except Exception as e:
-        print(f"Error fetching data for ticker {ticker_sn}: {str(e)}")
-        return []
+            if hist.empty:
+                logger.warning(f"No new data returned for {full_symbol}")
+                return []
+
+            # Try to get market cap once
+            try:
+                market_cap = self.to_decimal(stock.info.get('marketCap'))
+            except Exception:
+                market_cap = None
+                logger.warning(f"Failed to fetch market cap for {full_symbol}")
+
+            # Process each day's data
+            current_time = timezone.now()
+            for date, row in hist.iterrows():
+                price_data = {
+                    'security': security,
+                    'date': date.date(),
+                    'price': self.to_decimal(row.get('Close')),
+                    'market_cap': market_cap,
+                    'open_price': self.to_decimal(row.get('Open')),
+                    'high_price': self.to_decimal(row.get('High')),
+                    'low_price': self.to_decimal(row.get('Low')),
+                    'close_price': self.to_decimal(row.get('Close')),
+                    'adj_close': self.to_decimal(row.get('Close')),
+                    'volume': row.get('Volume') or 0,
+                    'created_at': current_time,
+                    'updated_at': current_time
+                }
+                price_data_list.append(price_data)
+
+            return price_data_list
+
+        except Exception as e:
+            logger.error(f"Error fetching data for {full_symbol}: {str(e)}")
+            return []
 
 
 class Command(BaseCommand):
-    help = 'Populate historical price data for each ticker using the Yahoo Finance API'
+    help = 'Update price data for securities in specified exchange'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--period',
+            '--exchange',
             type=str,
-            default='1mo',
-            help='Period to fetch (e.g., 1mo, 3mo, 6mo, 1y, 2y, 5y, max)'
+            required=True,
+            help='Exchange code to update (e.g., NYSE)'
         )
         parser.add_argument(
-            '--replace',
-            action='store_true',
-            help='Replace existing data for the period'
+            '--security',
+            type=str,
+            help='Specific security ticker to update (optional)'
         )
 
-    def handle(self, *args, **kwargs):
-        period = kwargs['period']
-        replace = kwargs['replace']
+    def handle(self, *args, **options):
+        start_time = timezone.now()
+        exchange_code = options['exchange']
+        specific_security = options.get('security')
 
-        # Get list of unique tickers from FinancialData
-        tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
-        if replace:
-            PriceData.objects.all().delete()
-            print("All existing PriceData entries have been deleted.")
+        try:
+            # Get exchange and securities
+            exchange = Exchange.objects.get(code=exchange_code)
+            securities = Security.objects.filter(
+                exchange=exchange,
+                is_active=True
+            )
+            if specific_security:
+                securities = securities.filter(ticker=specific_security)
 
-        # Initialize progress bar
-        with tqdm(total=len(tickers), desc="Fetching Historical Data") as pbar:
-            for ticker in tickers:
+            if not securities.exists():
+                logger.warning(f"No active securities found for {exchange.name}")
+                return
+
+            # Initialize fetcher
+            fetcher = PriceDataFetcher(exchange)
+            total_records = 0
+
+            # Process each security
+            for security in securities:
                 try:
-                    # Fetch historical data
-                    price_data_objects = fetch_stock_data(ticker, period=period)
+                    with transaction.atomic():
+                        price_data_list = fetcher.fetch_data(security)
 
-                    if price_data_objects:
-                        with transaction.atomic():
-                            # If replace flag is set, delete existing data for this period
-                            if replace:
-                                earliest_date = min(obj.date for obj in price_data_objects)
-                                latest_date = max(obj.date for obj in price_data_objects)
-                                PriceData.objects.filter(
-                                    ticker=ticker,
-                                    date__range=(earliest_date, latest_date)
-                                ).delete()
+                        if price_data_list:
+                            PriceData.objects.bulk_create([
+                                PriceData(**data) for data in price_data_list
+                            ], ignore_conflicts=True)
 
-                            # Bulk create new records
-                            PriceData.objects.bulk_create(
-                                price_data_objects,
-                                ignore_conflicts=True  # Skip if record already exists
+                            total_records += len(price_data_list)
+                            logger.info(
+                                f"Added {len(price_data_list)} records for {security.ticker}"
                             )
 
-                        print(f"Successfully saved {len(price_data_objects)} records for {ticker}")
-
-                    # Add small delay to avoid hitting API limits
-                    time.sleep(0.5)
+                        # Respect API rate limits
+                        time.sleep(0.5)
 
                 except Exception as e:
-                    print(f"Error processing {ticker}: {str(e)}")
+                    logger.error(f"Error processing {security.ticker}: {str(e)}")
 
-                finally:
-                    pbar.update(1)
+            # Log summary
+            duration = timezone.now() - start_time
+            logger.info(
+                f"Update completed for {exchange.name}. "
+                f"Added {total_records} records in {duration.total_seconds():.1f} seconds"
+            )
 
-        self.stdout.write(self.style.SUCCESS('Data import completed'))
+        except Exchange.DoesNotExist:
+            logger.error(f"Exchange {exchange_code} not found")
+        except Exception as e:
+            logger.error(f"Command failed: {str(e)}")

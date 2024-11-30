@@ -24,3 +24,5 @@ python-decouple
 psycopg2-binary
 dj_database_url
 djangorestframework
+schedule
+pytz

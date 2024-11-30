@@ -22,7 +22,7 @@ import datetime
 logging.basicConfig(level=logging.DEBUG)
 G_datafold = BASE_DIR / 'media' / 'Data' / 'Chile'
 G_root_dir = BASE_DIR
-##Scraiping of PDF or online not working, not matter since source does not work well anymore
+##Scraiping of PDF or (online not working, not matter since source does not work well anymore)
 class Ticker:
     datafold = G_datafold
     root_dir = G_root_dir

@@ -1,0 +1,98 @@
+<!-- templates/fin_data_cl/financial_report_accordion.html -->
+{% load text_filters %}
+<div class="accordion" id="financialReportAccordion{{ side }}">
+    <!-- Business Overview -->
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingOverview{{ side }}">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseOverview{{ side }}"
+                    aria-expanded="true"
+                    aria-controls="collapseOverview{{ side }}">
+                Business Overview
+            </button>
+        </h2>
+        <div id="collapseOverview{{ side }}"
+             class="accordion-collapse collapse show"
+             aria-labelledby="headingOverview{{ side }}"
+             data-bs-parent="#financialReportAccordion{{ side }}">
+            <div class="accordion-body">
+                <p>{{ report.business_overview|format_subsection|safe }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risks -->
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingRisks{{ side }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseRisks{{ side }}"
+                    aria-expanded="false"
+                    aria-controls="collapseRisks{{ side }}">
+                Risks
+            </button>
+        </h2>
+        <div id="collapseRisks{{ side }}"
+             class="accordion-collapse collapse"
+             aria-labelledby="headingRisks{{ side }}"
+             data-bs-parent="#financialReportAccordion{{ side }}">
+            <div class="accordion-body">
+                {% for risk in report.risks %}
+                    {% if risk.description|wordcount >= 10 %}
+                        <p><strong>Description:</strong> {{ risk.description|format_subsection|safe }}</p>
+                        <hr>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Changes -->
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingChanges{{ side }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseChanges{{ side }}"
+                    aria-expanded="false"
+                    aria-controls="collapseChanges{{ side }}">
+                Historical Changes
+            </button>
+        </h2>
+        <div id="collapseChanges{{ side }}"
+             class="accordion-collapse collapse"
+             aria-labelledby="headingChanges{{ side }}"
+             data-bs-parent="#financialReportAccordion{{ side }}">
+            <div class="accordion-body">
+                {% for change in report.historical_changes %}
+                    {% if change.description|wordcount >= 10 %}
+                        <p><strong>Description:</strong> {{ change.description|format_subsection|safe }}</p>
+                        <hr>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Future Outlook -->
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingOutlook{{ side }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapseOutlook{{ side }}"
+                    aria-expanded="false"
+                    aria-controls="collapseOutlook{{ side }}">
+                Future Outlook
+            </button>
+        </h2>
+        <div id="collapseOutlook{{ side }}"
+             class="accordion-collapse collapse"
+             aria-labelledby="headingOutlook{{ side }}"
+             data-bs-parent="#financialReportAccordion{{ side }}">
+            <div class="accordion-body">
+                {% for outlook in report.future_outlook %}
+                    {% if outlook.description|wordcount >= 10 %}
+                        <p><strong>Description:</strong> {{ outlook.description|format_subsection|safe }}</p>
+                        <hr>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

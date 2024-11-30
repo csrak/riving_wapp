@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from django.db.models import QuerySet
 import numpy as np
-from fin_data_cl.models import PriceData, Dividend
+from fin_data_cl.models import PriceData, DividendData
 
 
 class StockVisualizer:
@@ -62,7 +62,7 @@ class StockVisualizer:
                     self.price_data.loc[invalid_highs.index, ['low_price', 'high_price']].values
 
             # Load dividend data
-            dividend_queryset = Dividend.objects.filter(
+            dividend_queryset = DividendData.objects.filter(
                 ticker=self.ticker,
                 date__range=(start_date, end_date)
             ).order_by('date')

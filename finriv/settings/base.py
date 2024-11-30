@@ -108,3 +108,11 @@ Q_CLUSTER = {
     'retry': 120,
     'orm': 'default',  # Use Django ORM as the broker
 }
+
+# settings.py
+PRICE_UPDATE_SETTINGS = {
+    'PRICE_UPDATE_INTERVAL': 30,  # minutes
+    'MIN_UPDATE_SPACING': 5,      # minimum minutes between updates
+    'MAX_UPDATE_ATTEMPTS': 3,     # per exchange
+    'MAX_CONSECUTIVE_ERRORS': 5,  # across all exchanges
+}

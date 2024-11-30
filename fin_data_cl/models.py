@@ -1,20 +1,168 @@
 from django.db import models
-from decimal import Decimal
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+from finriv.utils.exchanges import ExchangeRegistry
+from django.utils import timezone
 
-class RiskComparison(models.Model):
-    ticker = models.CharField(max_length=20)
-    year = models.PositiveIntegerField()
-    month = models.PositiveIntegerField()
+class Exchange(models.Model):
+    """
+    Database representation of supported exchanges.
+    This model mirrors the Exchange configuration from utils/exchanges.py but persists the data.
+    """
+    code = models.CharField(max_length=10, unique=True, help_text="Exchange code (e.g., 'NYSE')")
+    name = models.CharField(max_length=100, help_text="Full exchange name")
+    timezone = models.CharField(max_length=50, help_text="Timezone (e.g., 'America/New_York')")
+    suffix = models.CharField(max_length=10, help_text="Symbol suffix (e.g., '.NYQ')")
+    trading_start = models.TimeField(help_text="Trading session start time")
+    trading_end = models.TimeField(help_text="Trading session end time")
+    break_start = models.TimeField(null=True, blank=True, help_text="Break period start (optional)")
+    break_end = models.TimeField(null=True, blank=True, help_text="Break period end (optional)")
+
+    class Meta:
+        verbose_name = "Exchange"
+        verbose_name_plural = "Exchanges"
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    def clean(self):
+        """Validate break times if they exist"""
+        if bool(self.break_start) != bool(self.break_end):
+            raise ValidationError("Both break start and end must be set if one is provided")
+        if self.break_start and self.break_end:
+            if not (self.trading_start < self.break_start < self.break_end < self.trading_end):
+                raise ValidationError("Break period must be within trading hours")
+
+    @classmethod
+    def sync_from_registry(cls):
+        """
+        Synchronize database exchanges with the configuration in exchanges.py
+        Returns tuple of (created_count, updated_count)
+        """
+        registry = ExchangeRegistry()
+        created, updated = 0, 0
+
+        for exchange_config in registry.get_all_exchanges():
+            exchange, was_created = cls.objects.update_or_create(
+                code=exchange_config.code,
+                defaults={
+                    'name': exchange_config.name,
+                    'timezone': exchange_config.timezone,
+                    'suffix': exchange_config.suffix,
+                    'trading_start': exchange_config.trading_hours.trading_start,
+                    'trading_end': exchange_config.trading_hours.trading_end,
+                    'break_start': exchange_config.trading_hours.break_start,
+                    'break_end': exchange_config.trading_hours.break_end,
+                }
+            )
+            if was_created:
+                created += 1
+            else:
+                updated += 1
+
+        return created, updated
+
+
+class Security(models.Model):
+    """
+    Base model for tradable securities across all exchanges
+    """
+    ticker = models.CharField(max_length=20, help_text="Security symbol without suffix")
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        help_text="Exchange where the security is traded"
+    )
+    name = models.CharField(max_length=200, help_text="Security name/description")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this security is currently traded"
+    )
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('ticker', 'exchange')
+        verbose_name = "Security"
+        verbose_name_plural = "Securities"
+
+    def __str__(self):
+        return f"{self.ticker}.{self.exchange.suffix}"
+
+    @property
+    def full_symbol(self):
+        """Return the complete symbol including exchange suffix"""
+        return f"{self.ticker}.{self.exchange.suffix}"
+
+
+class BaseFinancialData(models.Model):
+    """
+    Abstract base model for all financial data
+    Using explicit timestamp fields instead of auto_now for better control
+    """
+    security = models.ForeignKey(
+        'Security',  # Using string to avoid circular imports
+        on_delete=models.CASCADE,
+        related_name='%(class)s_data',  # This creates unique related names for each child class
+        null=True,
+        blank=True
+    )
+    date = models.DateField(
+        help_text="Date this data point represents",
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(
+        default=timezone.now,  # Set default to timezone.now for creation timestamp
+        help_text="When this record was first created",
+        editable=True  # Making it editable gives us more control
+    )
+    updated_at = models.DateTimeField(
+        default=timezone.now,  # Set default to timezone.now for creation timestamp
+        help_text="When this record was last updated",
+        editable=True
+    )
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        # Set timestamps explicitly if not provided
+        if not self.created_at:
+            self.created_at = timezone.now()
+        self.updated_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_last_update_date(cls, security):
+        """Get the most recent data date for a security"""
+        latest = cls.objects.filter(security=security).order_by('-date').first()
+        return latest.date if latest else None
+
+    @classmethod
+    def get_start_date(cls, security):
+        """
+        Determine the start date for data fetching
+        Returns either the day after the last update or 10 years ago
+        """
+        last_date = cls.get_last_update_date(security)
+        if last_date:
+            return last_date + timezone.timedelta(days=1)
+
+        # If no data exists, start from 10 years ago
+        return timezone.now().date() - timezone.timedelta(days=3650)  # 10 years
+
+
+class RiskComparison(BaseFinancialData):
+    # ticker = models.CharField(max_length=20)
+    # year = models.PositiveIntegerField()
+    # month = models.PositiveIntegerField()
 
     new_risks = models.JSONField(blank=True, null=True)
     old_risks = models.JSONField(blank=True, null=True)
     modified_risks = models.JSONField(blank=True, null=True)
-    def __str__(self):
-        return f"Financial Risks for {self.ticker} ({self.month}-{self.year})"
-class FinancialReport(models.Model):
-    ticker = models.CharField(max_length=20)
-    year = models.PositiveIntegerField()
-    month = models.PositiveIntegerField()
+
+
+class FinancialReport(BaseFinancialData):
 
     business_overview = models.TextField()
     risks = models.JSONField()
@@ -22,17 +170,14 @@ class FinancialReport(models.Model):
     historical_changes = models.JSONField()
     future_outlook = models.JSONField()
 
-    def __str__(self):
-        return f"Financial Report for {self.ticker} ({self.month}-{self.year})"
 
-class TickerData(models.Model):
-    ticker = models.CharField(max_length=10)
+# class TickerData(models.Model):
+#     ticker = models.CharField(max_length=10)
+#
+#     class Meta:
+#         abstract = True
 
-    class Meta:
-        abstract = True
-
-class FinancialData(TickerData):
-    date = models.DateField()
+class FinancialData(BaseFinancialData):
     revenue = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     net_profit = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     operating_profit = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
@@ -80,14 +225,8 @@ class FinancialData(TickerData):
     cash_short_investment = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     employee_benefits = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
 
-    class Meta:
-        unique_together = ('ticker', 'date')
-        verbose_name = 'Financial Data'
-        verbose_name_plural = 'Financial Data'
 
-class PriceData(models.Model):
-    ticker = models.CharField(max_length=10)
-    date = models.DateField()
+class PriceData(BaseFinancialData):
     price = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     market_cap = models.DecimalField(max_digits=30, decimal_places=2, null=True, blank=True)  # New field for Market Cap
     open_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -97,13 +236,9 @@ class PriceData(models.Model):
     adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     volume = models.BigIntegerField(null=True, blank=True)
-    def __str__(self):
-        return f"{self.ticker} - {self.date}"
 
-class FinancialRatio(models.Model):
-    ticker = models.CharField(max_length=10)
-    date = models.DateField()
 
+class FinancialRatio(BaseFinancialData):
     pe_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Price-to-Earnings
     pb_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Price-to-Book
     ps_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Price-to-Sales
@@ -121,31 +256,32 @@ class FinancialRatio(models.Model):
     quick_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Quick Ratio
     dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield this year
     before_dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield previous year
-    class Meta:
-        unique_together = ('ticker', 'date')
-        verbose_name = 'Financial Ratio'
-        verbose_name_plural = 'Financial Ratios'
-class DividendSummary(models.Model): #Deprecated
-    ticker = models.CharField(max_length=10)
-    year = models.IntegerField()
-    total_dividends = models.DecimalField(max_digits=20, decimal_places=2)
-    dividend_count = models.IntegerField()
 
-    class Meta:
-        unique_together = ('ticker', 'year')
-        verbose_name = 'Dividend Summary'
-        verbose_name_plural = 'Dividend Summaries'
-        get_latest_by = 'year'  # Add this line
-    def __str__(self):
-        return f"{self.ticker} - {self.year}"
 
-class Dividend(models.Model):
+
+# class DividendSummary(BaseFinancialData): #Deprecated
+#     ticker = models.CharField(max_length=10)
+#     year = models.IntegerField()
+#     total_dividends = models.DecimalField(max_digits=20, decimal_places=2)
+#     dividend_count = models.IntegerField()
+#
+#     class Meta:
+#         unique_together = ('ticker', 'year')
+#         verbose_name = 'Dividend Summary'
+#         verbose_name_plural = 'Dividend Summaries'
+#         get_latest_by = 'year'  # Add this line
+#
+#     def __str__(self):
+#         return f"{self.ticker} - {self.year}"
+
+
+class DividendData(BaseFinancialData):
     """
     Comprehensive model to store detailed dividend history
     with methods for aggregation and summary retrieval
     """
-    ticker = models.CharField(max_length=10, db_index=True)
-    date = models.DateField(db_index=True)
+    #ticker = models.CharField(max_length=10, db_index=True)
+    #date = models.DateField(db_index=True)
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     dividend_type = models.IntegerField(choices=[
         (1, 'Type 1'),

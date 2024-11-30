@@ -1,6 +1,8 @@
 from django import template
 import re
 import markdown
+import ast
+import json
 
 register = template.Library()
 
@@ -19,3 +21,27 @@ def format_subsection(value):
 
     #formatted_value = markdown.markdown(value)
     return formatted_value
+
+
+@register.filter
+def format_risks(value):
+    """
+    Formats risks from JSONField, handling different possible input types
+    """
+    # Handle None
+    if value is None:
+        return []
+
+    # If already a list, return as-is
+    if isinstance(value, list):
+        return value
+
+    # Try parsing as JSON string
+    try:
+        parsed_value = json.loads(value)
+        if isinstance(parsed_value, list):
+            return parsed_value
+        return [parsed_value]
+    except (TypeError, json.JSONDecodeError):
+        # If not JSON, convert to list
+        return [str(value)]
