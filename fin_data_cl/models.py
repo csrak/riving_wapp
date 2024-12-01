@@ -153,17 +153,12 @@ class BaseFinancialData(models.Model):
 
 
 class RiskComparison(BaseFinancialData):
-    # ticker = models.CharField(max_length=20)
-    # year = models.PositiveIntegerField()
-    # month = models.PositiveIntegerField()
-
     new_risks = models.JSONField(blank=True, null=True)
     old_risks = models.JSONField(blank=True, null=True)
     modified_risks = models.JSONField(blank=True, null=True)
 
 
 class FinancialReport(BaseFinancialData):
-
     business_overview = models.TextField()
     risks = models.JSONField()
     metrics = models.JSONField()

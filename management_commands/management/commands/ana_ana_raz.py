@@ -1,22 +1,22 @@
 # my_app/management/commands/run_my_script.py
 from django.core.management.base import BaseCommand
 #from finriv.utils.scrapping_classes import test as test_ticker
-from finriv.settings import BASE_DIR
+from django.conf import settings
+BASE_DIR = settings.BASE_DIR
 from finriv.utils.scrapping_classes import Ticker,TestCmfScraping
 from fin_data_cl.models import FinancialReport
-import unittest
-from pathlib import Path
+
 G_datafold = BASE_DIR / 'media' / 'Data' / 'Chile'
 G_root_dir = BASE_DIR
-
+from datetime import datetime
 import os, time
 import pandas as pd
 from pathlib import Path
 import fitz  # PyMuPDF
 import re
 import json
-from llama_index.llms.ollama import Ollama
-
+#from llama_index.llms.ollama import Ollama
+from fin_data_cl.models import Exchange, Security
 from dataclasses import dataclass
 from typing import List, Optional
 from enum import Enum
@@ -269,10 +269,10 @@ class FileSearcher:
         # Get all tickers as dataframe
         self.all_tickers = Ticker.get_all_tickers_as_dataframe()
 
-    def search_files_for_tickers(self, start_year = 2023):
+    def search_files_for_tickers(self, start_year = 2023, securities=None):
         if self.all_tickers is None:
-            raise ValueError("Tickers dataframe is not loaded. Call load_tickers() first.")
-
+            raise ValueError("Tickers dataframe is not loaded. Initialize all_tickers first.")
+        now= datetime.now()
         # Iterate through each ticker
         for _, row in self.all_tickers.iterrows():
             ticker = row['Ticker']
@@ -284,7 +284,9 @@ class FileSearcher:
                     month, year = folder.name.split('-')
                     if int(year) >= start_year:
                         # Construct expected filename
-                        if not FinancialReport.objects.filter(ticker=ticker,year=year,month=month).exists():
+                        date = datetime.strptime(f"01-{month}-{year}", "%d-%m-%Y")
+                        security = securities.filter(ticker=ticker).first()
+                        if not FinancialReport.objects.filter(security=security,date= date).exists():
                             file_name = f"Analisis_{ticker}_{folder.name}.pdf"
                             file_path = folder / file_name
 
@@ -293,7 +295,7 @@ class FileSearcher:
                                 print(f"File found: {file_path}")
                                 response = self.parse_pdf(file_path)
                                 if response:
-                                    self.save_response(ticker, year, month, response)
+                                    self.save_response(security, date, response, now)
                         else:
                             print(f"The {ticker} for year {year} and month {month} already exists in database, skipping.")
                         #else:
@@ -332,16 +334,17 @@ class FileSearcher:
         structured_data = {"chunks": chunks}
         return json.dumps(structured_data, indent=2)
 
-    def save_response(self, ticker, year, month, analysis):
+    def save_response(self, security, date, analysis, now):
         # Save the response to the CSV file for debugging
         try:
             metrics = dict(analysis.metrics)
         except TypeError:
             metrics = ["Missing"]
         financial_report, created = FinancialReport.objects.get_or_create(
-            ticker=ticker,
-            year=year,
-            month=month,
+            security=security,
+            created_at=now,
+            updated_at=now,
+            date= date,
             defaults={
                 'business_overview': analysis.business_overview,
                 'risks': [dict(r) for r in analysis.risks],
@@ -425,7 +428,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--do_all',
             action='store_true',
-            help='Print what would be done without actually performing the analysis'
+            help='Do all reports'
         )
         parser.add_argument(
             '--output-dir',
@@ -438,6 +441,12 @@ class Command(BaseCommand):
             type=int,
             help='The year to start processing quarters from (e.g., 2022)'
         )
+        parser.add_argument(
+            '--exchange',
+            type=str,
+            required=True,
+            help='Exchange code to update (e.g., NYSE)'
+        )
     def handle(self, *args, **kwargs):
         self.stdout.write('Running utility script...')
         #test_ticker()
@@ -447,9 +456,14 @@ class Command(BaseCommand):
         #unittest.TextTestRunner(verbosity=2).run(suite)
         searcher = FileSearcher(G_datafold, use_llamaindex=True)
         start_year = kwargs['start_year']
+        exchange_code = kwargs['exchange'].upper()
+        exchange = Exchange.objects.get(code=exchange_code)
+        securities = Security.objects.filter(
+            exchange=exchange,
+            is_active=True)
         print(start_year)
         if start_year:
-            searcher.search_files_for_tickers(start_year = start_year)
+            searcher.search_files_for_tickers(start_year=start_year, securities=securities)
         else:
             print("Specify start year with --start-year")
             return

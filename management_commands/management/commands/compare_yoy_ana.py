@@ -10,10 +10,12 @@ from openai import OpenAI as OpenAIog
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 from fin_data_cl.models import RiskComparison as Model_Risk
+from fin_data_cl.models import Exchange, Security
 import logging
 import time
 from pydantic import BaseModel, Field
 from collections import defaultdict
+from django.utils import timezone
 import openai
 from dateutil.relativedelta import relativedelta
 logging.basicConfig(level=logging.INFO)
@@ -276,20 +278,26 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--exchange',
+            type=str,
+            required=True,
+            help='Exchange code to update (e.g., NYSE)'
+        )
+        parser.add_argument(
             '--dry-run',
             action='store_true',
-            help='Print what would be done without actually performing the analysis'
+            help='Show what would be done. Not updated.'
         )
         parser.add_argument(
             '--do_all',
             action='store_true',
-            help='Print what would be done without actually performing the analysis'
+            help='Do all. Only tested current run option.'
         )
         parser.add_argument(
             '--output-dir',
             type=str,
             default='analysis_results',
-            help='Directory to store analysis results'
+            help='Optional: Specify output directory. '
         )
         parser.add_argument(
             '--start-year',
@@ -330,7 +338,12 @@ class Command(BaseCommand):
             analyzer = ReportAnalyzer(api_key)
             locator = ReportLocator(data_folder)
             start_year = options.get('start_year')
-
+            exchange_code = options['exchange'].upper()
+            exchange = Exchange.objects.get(code=exchange_code)
+            securities = Security.objects.filter(
+                exchange=exchange,
+                is_active=True
+            )
             if options['do_all']:
                 quarter_pairs = locator.get_consecutive_quarter_pairs()
 
@@ -373,10 +386,13 @@ class Command(BaseCommand):
                                 comparison
                             )
                             # We'll use period 2 as reference
+                            security_ob = securities.filter(ticker=tick).first()
+                            current_time = timezone.now()
                             financial_risk, created = Model_Risk.objects.get_or_create(
-                                ticker=tick,
-                                year=int(datetime.strptime(next_quarter.name, '%m-%Y').year),
-                                month=int(datetime.strptime(next_quarter.name, '%m-%Y').month),
+                                security=security_ob,
+                                date=datetime.strptime(next_quarter.name, '%m-%Y').date(),
+                                created_at=current_time,
+                                updated_at=current_time,
                                 defaults={
                                     'new_risks': [i.name + "\n" + i.description for i in comparison.new_risks],
                                     'old_risks': [i.name + "\n" + i.description for i in comparison.removed_risks],
@@ -441,6 +457,8 @@ class Command(BaseCommand):
                     comparison
                 )
                 #We'll use period 2 as reference
+
+                current_time = timezone.now()
                 financial_risk, created = Model_Risk.objects.get_or_create(
                     ticker=ticker,
                     year=int(datetime.strptime(period2.name, '%m-%Y').year),

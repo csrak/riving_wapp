@@ -2,13 +2,25 @@ import pandas as pd
 from decimal import Decimal, InvalidOperation
 from tqdm import tqdm
 from django.core.management.base import BaseCommand
-from fin_data_cl.models import FinancialData, PriceData, FinancialRatio
+from django.utils import timezone
+from fin_data_cl.models import Exchange, Security, FinancialData
 
 class Command(BaseCommand):
     help = 'Import financial data from a CSV file'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--exchange',
+            type=str,
+            required=True,
+            help='Exchange code to update (e.g., NYSE)'
+        )
+
+
     def handle(self, *args, **kwargs):
         file_path = r'C:\Users\s0Csrak\OneDrive\Documents\python\RIVING-Tools\Data\Chile\Database_in_CLP.csv'
+        start_time = timezone.now()
+        exchange_code = kwargs['exchange'].upper()
 
         def clean_column_names(df):
             df.columns = (
@@ -52,6 +64,7 @@ class Command(BaseCommand):
                 tickers = df_relevant['ticker'].unique()
 
                 for ticker in tickers:
+
                     ticker_data = df_relevant[df_relevant['ticker'] == ticker]
                     prev_processed_value = Decimal(0)
                     processed_values = []
@@ -90,24 +103,34 @@ class Command(BaseCommand):
                         ticker_tables[ticker] = metric_df
 
             tickers_list = list(ticker_tables.keys())
-            tables_list = [ticker_tables[ticker] for ticker in tickers_list]
+            tables_list = [ticker_tables[tickerr] for tickerr in tickers_list]
 
             return tickers_list, tables_list
 
-        def save_financial_data(ticker, date, **kwargs):
-            cleaned_data = {k: (v if pd.notna(v) else None) for k, v in kwargs.items()}
+        def save_financial_data(securityob, date, created_at, updated_at,**opts):
+            cleaned_data = {k: (v if pd.notna(v) else None) for k, v in opts.items()}
             FinancialData.objects.update_or_create(
-                ticker=ticker,
+                security=securityob,
                 date=date,
+                created_at=created_at,
+                updated_at=updated_at,
                 defaults=cleaned_data
             )
 
         ticker_list, tables_list = parse_and_create_database(file_path)
-
+        exchange = Exchange.objects.get(code=exchange_code)
+        securities = Security.objects.filter(
+            exchange=exchange,
+            is_active=True
+        )
+        current_time = timezone.now()
         for ticker, df in tqdm(zip(ticker_list, tables_list), desc="Saving Data", total=len(ticker_list)):
+            security_ob = securities.filter(ticker=ticker).first()
             for _, row in df.iterrows():
                 save_financial_data(
-                    ticker=ticker,
+                    securityob=security_ob,
                     date=row['date'],
+                    created_at=current_time,
+                    updated_at=current_time,
                     **{metric: row.get(metric) for metric in df.columns if metric != 'date'}
                 )

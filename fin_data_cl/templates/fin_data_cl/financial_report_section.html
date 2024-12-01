@@ -1,4 +1,3 @@
-<!-- templates/fin_data_cl/financial_report_section.html -->
 <div class="financial-report-section">
     <h1 class="mb-4">Search Financial Report #{{ number }}</h1>
 
@@ -7,7 +6,10 @@
         <input type="hidden" name="form_id" value="{{ form_id }}">
         <div class="row g-3 align-items-center">
             <div class="col-auto">
-                {{ form.ticker.label_tag }} {{ form.ticker }}
+                {{ form.exchange.label_tag }} {{ form.exchange }}
+            </div>
+            <div class="col-auto">
+                {{ form.security.label_tag }} {{ form.security }}
             </div>
             <div class="col-auto">
                 {{ form.year.label_tag }} {{ form.year }}
@@ -27,7 +29,7 @@
         {% endwith %}
     {% else %}
         <div class="alert alert-warning mt-4" role="alert">
-            No financial report found for the selected ticker and date.
+            No financial report found for the selected criteria.
         </div>
     {% endif %}
 </div>

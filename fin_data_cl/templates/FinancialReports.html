@@ -16,4 +16,195 @@
         {% endwith %}
     </div>
 </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+    // Helper function to show loading state in select elements
+    function setLoadingState(selectElement) {
+        selectElement.disabled = true;
+        selectElement.innerHTML = '<option value="">Loading...</option>';
+    }
+
+    // Helper function to handle fetch errors
+    function handleFetchError(selectElement, error) {
+        console.error("Fetch error:", error);
+        selectElement.disabled = false;
+        selectElement.innerHTML = '<option value="">Error loading options</option>';
+    }
+
+    // Helper function to get the form prefix (left/right) from an element
+    function getPrefix(element) {
+        const name = element.getAttribute('name');
+        return name.includes('-') ? name.split('-')[0] : '';
+    }
+
+    // Helper function to clear all dependent dropdowns
+    function clearDependentDropdowns(currentSelect, prefix) {
+        // Get all dependent fields that should be cleared
+        const dependentFields = [];
+        let currentField = currentSelect;
+
+        while (currentField && currentField.getAttribute('data-dependent')) {
+            const nextFieldName = currentField.getAttribute('data-dependent');
+            const nextField = document.querySelector(
+                `select[name="${prefix}-${nextFieldName}"]`
+            );
+            if (nextField) {
+                dependentFields.push(nextField);
+                currentField = nextField;
+            } else {
+                break;
+            }
+        }
+
+        // Clear and disable all dependent fields
+        dependentFields.forEach(field => {
+            field.disabled = true;
+            field.innerHTML = '<option value="">Select previous field first</option>';
+        });
+    }
+
+    // Function to update security dropdown based on exchange selection
+    function updateSecurities(exchangeId, securitySelect) {
+        setLoadingState(securitySelect);
+
+        fetch(`/securities/${exchangeId}/`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                securitySelect.disabled = false;
+                securitySelect.innerHTML = '<option value="">Select a Security</option>';
+                data.forEach(security => {
+                    const option = document.createElement("option");
+                    option.value = security.id;
+                    option.textContent = security.name;
+                    securitySelect.appendChild(option);
+                });
+            })
+            .catch(error => handleFetchError(securitySelect, error));
+    }
+
+    // Function to update year dropdown based on security selection
+    function updateYears(securityId, yearSelect) {
+        setLoadingState(yearSelect);
+
+        fetch(`/dates/${securityId}/`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                yearSelect.disabled = false;
+                yearSelect.innerHTML = '<option value="">Select a Year</option>';
+                data.years.forEach(year => {
+                    const option = document.createElement("option");
+                    option.value = year;
+                    option.textContent = year;
+                    yearSelect.appendChild(option);
+                });
+            })
+            .catch(error => handleFetchError(yearSelect, error));
+    }
+
+    // Function to update month dropdown based on year selection
+    function updateMonths(securityId, year, monthSelect) {
+        setLoadingState(monthSelect);
+
+        fetch(`/months/${securityId}/${year}/`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                monthSelect.disabled = false;
+                monthSelect.innerHTML = '<option value="">Select a Month</option>';
+                data.months.forEach(month => {
+                    const option = document.createElement("option");
+                    option.value = month;
+                    option.textContent = month;
+                    monthSelect.appendChild(option);
+                });
+            })
+            .catch(error => handleFetchError(monthSelect, error));
+    }
+
+    // Function to restore previous selection in a dropdown
+    function restoreSelection(selectElement, value) {
+        if (!value) return;
+        Array.from(selectElement.options).forEach(option => {
+            if (option.value == value) {
+                option.selected = true;
+            }
+        });
+    }
+
+    // Set up event listeners for both left and right forms
+    ['left', 'right'].forEach(prefix => {
+        // Get all select elements for this form
+        const exchangeSelect = document.querySelector(`select[name="${prefix}-exchange"]`);
+        const securitySelect = document.querySelector(`select[name="${prefix}-security"]`);
+        const yearSelect = document.querySelector(`select[name="${prefix}-year"]`);
+        const monthSelect = document.querySelector(`select[name="${prefix}-month"]`);
+
+        if (!exchangeSelect) return; // Skip if form doesn't exist
+
+        // Exchange dropdown change handler
+        exchangeSelect.addEventListener("change", function() {
+            const exchangeId = this.value;
+            if (!exchangeId) return;
+
+            clearDependentDropdowns(this, prefix);
+            updateSecurities(exchangeId, securitySelect);
+        });
+
+        // Security dropdown change handler
+        securitySelect.addEventListener("change", function() {
+            const securityId = this.value;
+            if (!securityId) return;
+
+            clearDependentDropdowns(this, prefix);
+            updateYears(securityId, yearSelect);
+        });
+
+        // Year dropdown change handler
+        yearSelect.addEventListener("change", function() {
+            const securityId = securitySelect.value;
+            const year = this.value;
+            if (!securityId || !year) return;
+
+            clearDependentDropdowns(this, prefix);
+            updateMonths(securityId, year, monthSelect);
+        });
+
+        // Restore previous selections if they exist
+        const initialData = {
+            exchange: exchangeSelect.getAttribute('data-initial'),
+            security: securitySelect.getAttribute('data-initial'),
+            year: yearSelect.getAttribute('data-initial'),
+            month: monthSelect.getAttribute('data-initial')
+        };
+
+        // Trigger the cascade of updates if we have initial values
+        if (initialData.exchange) {
+            restoreSelection(exchangeSelect, initialData.exchange);
+            updateSecurities(initialData.exchange, securitySelect).then(() => {
+                if (initialData.security) {
+                    restoreSelection(securitySelect, initialData.security);
+                    updateYears(initialData.security, yearSelect).then(() => {
+                        if (initialData.year) {
+                            restoreSelection(yearSelect, initialData.year);
+                            updateMonths(initialData.security, initialData.year, monthSelect).then(() => {
+                                if (initialData.month) {
+                                    restoreSelection(monthSelect, initialData.month);
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    });
+});
+</script>
 {% endblock %}

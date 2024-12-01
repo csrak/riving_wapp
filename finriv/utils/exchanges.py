@@ -38,7 +38,7 @@ class ExchangeRegistry:
         # Chile (Santiago Stock Exchange)
         self.register_exchange(Exchange(
             suffix='SN',
-            code='SSE',
+            code='SCL',
             name='Santiago Stock Exchange',
             timezone='America/Santiago',
             trading_hours=TradingHours(

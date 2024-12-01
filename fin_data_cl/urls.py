@@ -11,5 +11,8 @@ urlpatterns = [
     path('filter_ratios/', views.filter_ratios, name='filter_ratios'),
     path('financial_reports/', views.search_financial_report, name='financial_reports'),
     path('financial_risks/', views.search_financial_risks, name='financial_risks'),
+    path('securities/<int:exchange_id>/', views.get_securities_for_exchange, name='get_securities'),
+    path('dates/<int:security_id>/',  views.get_years_for_security, name='get_years'),
+    path('months/<int:security_id>/<int:year>/',  views.get_months_for_year,    name='get_months'),
 ]
 

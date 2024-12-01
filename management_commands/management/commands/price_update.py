@@ -8,7 +8,7 @@ from django.utils import timezone
 import logging
 from typing import Optional, List, Dict
 from fin_data_cl.models import Exchange, Security, PriceData
-
+from tqdm import tqdm  # Import tqdm
 logger = logging.getLogger(__name__)
 
 
@@ -107,7 +107,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         start_time = timezone.now()
-        exchange_code = options['exchange']
+        exchange_code = options['exchange'].upper()
         specific_security = options.get('security')
 
         try:
@@ -129,7 +129,7 @@ class Command(BaseCommand):
             total_records = 0
 
             # Process each security
-            for security in securities:
+            for security in tqdm(securities, desc="Updating securities"):
                 try:
                     with transaction.atomic():
                         price_data_list = fetcher.fetch_data(security)

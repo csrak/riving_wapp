@@ -26,7 +26,7 @@ class DividendImporter:
 
     def __init__(self):
         # Get Santiago Stock Exchange instance
-        self.exchange = Exchange.objects.get(code='SSE')
+        self.exchange = Exchange.objects.get(code='SCL')
         self.data_folder = Path(settings.MEDIA_ROOT) / 'Data' / 'Chile'
 
     def process_row(self, row: Dict) -> DividendData:
