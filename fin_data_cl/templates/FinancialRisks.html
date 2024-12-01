@@ -1,9 +1,9 @@
 {% extends "fin_data_cl/base.html" %}
 {% load text_filters %}
 
-{% block title %}Financial Risks{% endblock %}
+{% block title %}Risk Comparisons{% endblock %}
 {% block content %}
-<div class="row">
+<div class="row" data-comparison-type="risks">
     <div class="col-md-6 px-4">
         {% with form_id="left" number=1 side_name="Left" form=form_left report=report_left %}
             {% include "fin_data_cl/financial_risks_section.html" %}
@@ -16,4 +16,184 @@
         {% endwith %}
     </div>
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Helper function to show loading state in select elements
+    function setLoadingState(selectElement) {
+        selectElement.disabled = true;
+        selectElement.innerHTML = '<option value="">Loading...</option>';
+    }
+
+    // Helper function to handle fetch errors
+    function handleFetchError(selectElement, error) {
+        console.error("Fetch error:", error);
+        selectElement.disabled = false;
+        selectElement.innerHTML = '<option value="">Error loading options</option>';
+    }
+function getUrlPrefix() {
+    const row = document.querySelector('.row');
+    const comparisonType = row.dataset.comparisonType;
+    console.log('Comparison type:', comparisonType);
+    const prefix = comparisonType === 'risks' ? '/risks' : '';
+    console.log('URL prefix:', prefix);
+    return prefix;
+}
+function updateSecurities(exchangeId, securitySelect) {
+    if (!exchangeId || !securitySelect) return;
+
+    setLoadingState(securitySelect);
+    const urlPrefix = getUrlPrefix();
+
+    fetch(`${urlPrefix}/securities/${exchangeId}/`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            // Rest of the code remains the same
+        })
+        .catch(error => handleFetchError(securitySelect, error));
+}
+
+function updateYears(securityId, yearSelect) {
+    if (!securityId || !yearSelect) return;
+
+    setLoadingState(yearSelect);
+    const urlPrefix = getUrlPrefix();
+    const url = `${urlPrefix}/dates/${securityId}/`;
+
+    console.log('Fetching years from URL:', url);
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                console.error('Response not OK:', response.status, response.statusText);
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received years data:', data);
+            yearSelect.disabled = false;
+            yearSelect.innerHTML = '<option value="">Select a Year</option>';
+            if (data.years && Array.isArray(data.years)) {
+                data.years.forEach(year => {
+                    const option = document.createElement("option");
+                    option.value = year;
+                    option.textContent = year;
+                    yearSelect.appendChild(option);
+                });
+            } else {
+                console.error('Unexpected data format:', data);
+                yearSelect.innerHTML = '<option value="">No years available</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching years:', error);
+            handleFetchError(yearSelect, error);
+        });
+}
+
+function updateMonths(securityId, year, monthSelect) {
+    if (!securityId || !year || !monthSelect) return;
+
+    setLoadingState(monthSelect);
+    const urlPrefix = getUrlPrefix();
+    const url = `${urlPrefix}/months/${securityId}/${year}/`;
+
+    console.log('Fetching months from URL:', url);
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                console.error('Response not OK:', response.status, response.statusText);
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Received months data:', data);
+            monthSelect.disabled = false;
+            monthSelect.innerHTML = '<option value="">Select a Month</option>';
+            if (data.months && Array.isArray(data.months)) {
+                data.months.forEach(month => {
+                    const option = document.createElement("option");
+                    option.value = month;
+                    // Format month number to display name (e.g., 1 -> "January")
+                    const monthName = new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' });
+                    option.textContent = `${monthName} (${month})`;
+                    monthSelect.appendChild(option);
+                });
+            } else {
+                console.error('Unexpected data format:', data);
+                monthSelect.innerHTML = '<option value="">No months available</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching months:', error);
+            handleFetchError(monthSelect, error);
+        });
+}
+
+    // Set up event listeners for both forms
+    ['left', 'right'].forEach(prefix => {
+        console.log(`Setting up handlers for ${prefix} form`);
+
+        // Get form elements directly by their names
+        const exchangeSelect = document.querySelector(`select[name="${prefix}-exchange"]`);
+        const securitySelect = document.querySelector(`select[name="${prefix}-security"]`);
+        const yearSelect = document.querySelector(`select[name="${prefix}-year"]`);
+        const monthSelect = document.querySelector(`select[name="${prefix}-month"]`);
+
+        if (!exchangeSelect) {
+            console.error(`Could not find exchange select for ${prefix} form`);
+            return;
+        }
+
+        // Exchange change handler
+        exchangeSelect.addEventListener("change", function() {
+            const exchangeId = this.value;
+            if (!exchangeId) return;
+
+            console.log(`Exchange changed in ${prefix} form to: ${exchangeId}`);
+
+            // Reset and update dependent dropdowns
+            if (securitySelect) {
+                securitySelect.innerHTML = '<option value="">Select a Security</option>';
+                yearSelect.innerHTML = '<option value="">Select a Security First</option>';
+                monthSelect.innerHTML = '<option value="">Select a Year First</option>';
+                updateSecurities(exchangeId, securitySelect);
+            }
+        });
+
+        // Security change handler
+        if (securitySelect) {
+            securitySelect.addEventListener("change", function() {
+                const securityId = this.value;
+                if (!securityId) return;
+
+                console.log(`Security changed in ${prefix} form to: ${securityId}`);
+
+                yearSelect.innerHTML = '<option value="">Select a Year</option>';
+                monthSelect.innerHTML = '<option value="">Select a Year First</option>';
+                updateYears(securityId, yearSelect);
+            });
+        }
+
+        // Year change handler
+        if (yearSelect) {
+            yearSelect.addEventListener("change", function() {
+                const securityId = securitySelect.value;
+                const year = this.value;
+                if (!securityId || !year) return;
+
+                console.log(`Year changed in ${prefix} form to: ${year}`);
+
+                monthSelect.innerHTML = '<option value="">Select a Month</option>';
+                updateMonths(securityId, year, monthSelect);
+            });
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -3,130 +3,82 @@ from django.shortcuts import render
 from .models import FinancialData, FinancialRatio, PriceData, FinancialReport, RiskComparison, Security
 from django.db.models import Q, Subquery, OuterRef, DecimalField, F
 from django.db.models.functions import Cast
-#from .utils import generalized_search_view
+from .utils.search_view import generalized_search_view
 from .forms import FinancialReportSearchForm, FinancialRisksSearchForm
 from django.http import JsonResponse
 
 
-from django.contrib import messages
 from .models import FinancialReport, RiskComparison
 from .utils.fin_data_ops import FinancialRepository
-from .utils.session_utils import FinancialSessionManager
 
 
 def get_securities_for_exchange(request, exchange_id):
-    """API endpoint to get securities for an exchange."""
-    repository = FinancialRepository(FinancialReport)
-    securities = repository.get_securities_for_exchange(exchange_id)
-    return JsonResponse(securities, safe=False)
+    """Get securities for an exchange, checking if they have any associated data."""
+    model = RiskComparison if 'risks' in request.path else FinancialReport
+
+    securities = Security.objects.filter(
+        exchange_id=exchange_id,
+        is_active=True
+    )
+
+    return JsonResponse([
+        {"id": security.id, "name": security.name}
+        for security in securities
+    ], safe=False)
 
 
+# def get_years_for_security(request, security_id):
+#     """Get available years for a security, handling both reports and risks."""
+#     model = RiskComparison if 'risks' in request.path else FinancialReport
+#
+#     dates = model.objects.filter(
+#         security_id=security_id
+#     ).dates('date', 'month', order='DESC')
+#
+#     years = sorted(set(date.year for date in dates), reverse=True)
+#     return JsonResponse({"years": years})
 def get_years_for_security(request, security_id):
-    """API endpoint to get available years for a security."""
-    repository = FinancialRepository(FinancialReport)
-    years = repository.get_years_for_security(security_id)
+    """Get available years for a security, handling both reports and risks."""
+    model = RiskComparison if 'risks' in request.path else FinancialReport
+
+    print(f"Using model: {model.__name__}")  # Debug print
+
+    dates = model.objects.filter(
+        security_id=security_id
+    ).dates('date', 'month', order='DESC')
+
+    years = sorted(set(date.year for date in dates), reverse=True)
+    print(f"Found years: {years}")  # Debug print
+
     return JsonResponse({"years": years})
 
+# def get_months_for_year(request, security_id, year):
+#     """Get available months for a security and year, handling both reports and risks."""
+#     model = RiskComparison if 'risks' in request.path else FinancialReport
+#
+#     dates = model.objects.filter(
+#         security_id=security_id,
+#         date__year=year
+#     ).dates('date', 'month', order='DESC')
+#
+#     months = [date.month for date in dates]
+#     return JsonResponse({"months": months})
 
 def get_months_for_year(request, security_id, year):
-    """API endpoint to get available months for a security in a year."""
-    repository = FinancialRepository(FinancialReport)
-    months = repository.get_months_for_year(security_id, year)
-    return JsonResponse({"months": months})
+    """Get available months for a security and year, handling both reports and risks."""
+    model = RiskComparison if 'risks' in request.path else FinancialReport
 
+    print(f"Getting months for security {security_id}, year {year} using model {model.__name__}")
 
-def generalized_search_view(request, model, form_class, template_name):
-    """Generic view for financial data comparison."""
-    repository = FinancialRepository(model)
+    dates = model.objects.filter(
+        security_id=security_id,
+        date__year=year
+    ).dates('date', 'month', order='DESC')
 
-    # Initialize session managers for both sides
-    left_session = FinancialSessionManager(request, 'left')
-    right_session = FinancialSessionManager(request, 'right')
+    months = [date.month for date in dates]
+    print(f"Found months: {months}")
 
-    # Get initial data from session
-    left_data = left_session.get_from_session()
-    right_data = right_session.get_from_session()
-
-    # Initialize forms with session data or POST data
-    form_left = form_class(
-        data=request.POST if 'left' in request.POST.get('form_id', '') else None,
-        initial=left_data,
-        prefix='left'
-    )
-    form_right = form_class(
-        data=request.POST if 'right' in request.POST.get('form_id', '') else None,
-        initial=right_data,
-        prefix='right'
-    )
-
-    # Initialize reports
-    report_left = None
-    report_right = None
-
-    if request.method == 'POST':
-        if 'left' in request.POST.get('form_id', ''):
-            if form_left.is_valid():
-                data = form_left.cleaned_data
-                left_session.save_to_session(
-                    data['exchange'].id,
-                    data['security'].id,
-                    data['year'],
-                    data['month']
-                )
-                report_left = repository.get_by_criteria(
-                    data['security'].id,
-                    data['year'],
-                    data['month']
-                )
-                if not report_left:
-                    messages.warning(request, "No left-side report found for the selected criteria.")
-
-        elif 'right' in request.POST.get('form_id', ''):
-            if form_right.is_valid():
-                data = form_right.cleaned_data
-                right_session.save_to_session(
-                    data['exchange'].id,
-                    data['security'].id,
-                    data['year'],
-                    data['month']
-                )
-                report_right = repository.get_by_criteria(
-                    data['security'].id,
-                    data['year'],
-                    data['month']
-                )
-                if not report_right:
-                    messages.warning(request, "No right-side report found for the selected criteria.")
-
-    # Use session data for initial reports if not set by POST
-    if report_left is None and all(left_data.values()):
-        report_left = repository.get_by_criteria(
-            left_data['security'],
-            left_data['year'],
-            left_data['month']
-        )
-
-    if report_right is None and all(right_data.values()):
-        report_right = repository.get_by_criteria(
-            right_data['security'],
-            right_data['year'],
-            right_data['month']
-        )
-
-    context = {
-        'form_left': form_left,
-        'form_right': form_right,
-        'report_left': report_left,
-        'report_right': report_right,
-        # Additional context for template rendering
-        'page_title': 'Financial Reports' if model == FinancialReport else 'Risk Comparison',
-        'form_titles': {
-            'left': 'Report #1',
-            'right': 'Report #2'
-        }
-    }
-
-    return render(request, template_name, context)
+    return JsonResponse({"months": sorted(months)})  # Sort months for consistency
 
 
 # View functions using the generalized search view
