@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 from fin_data_cl.models import Exchange, Security
+from fin_data_cl.utils.Price_Update_manager import PriceUpdateManager  # New import
 from typing import Dict, Optional
 
 # Configure logging with more detailed formatting
@@ -31,6 +32,7 @@ class ExchangeUpdateTracker:
     def __init__(self):
         self.last_updates: Dict[str, datetime] = {}
         self.failed_attempts: Dict[str, int] = {}
+        self.exchange_managers: Dict[str, PriceUpdateManager] = {}  # New: store managers
 
     def record_update(self, exchange_code: str, success: bool):
         """Record an update attempt and its result"""
@@ -50,6 +52,12 @@ class ExchangeUpdateTracker:
         """Determine if we should retry updates for an exchange"""
         max_attempts = getattr(settings, 'MAX_UPDATE_ATTEMPTS', 3)
         return self.failed_attempts.get(exchange_code, 0) < max_attempts
+
+    def get_manager(self, exchange: Exchange) -> PriceUpdateManager:
+        """Get or create a PriceUpdateManager for an exchange"""
+        if exchange.code not in self.exchange_managers:
+            self.exchange_managers[exchange.code] = PriceUpdateManager(exchange)
+        return self.exchange_managers[exchange.code]
 
 
 class PriceUpdateScheduler:
@@ -99,8 +107,7 @@ class PriceUpdateScheduler:
 
     def update_exchange(self, exchange: Exchange):
         """
-        Execute price update for a specific exchange with error handling
-        and update tracking
+        Execute price update for a specific exchange using PriceUpdateManager
         """
         if not self.should_update_exchange(exchange):
             return
@@ -108,32 +115,27 @@ class PriceUpdateScheduler:
         try:
             logger.info(f"Starting scheduled price update for {exchange.name}")
 
-            # Count active securities for this exchange
-            security_count = Security.objects.filter(
-                exchange=exchange,
-                is_active=True
-            ).count()
+            # Get the manager for this exchange
+            manager = self.tracker.get_manager(exchange)
+            success = manager.execute_update()
 
-            if security_count == 0:
-                logger.warning(f"No active securities found for {exchange.name}")
-                return
+            # Record the update attempt
+            self.tracker.record_update(exchange.code, success)
 
-            logger.info(f"Updating {security_count} securities for {exchange.name}")
-
-            # Call the update command
-            management.call_command(
-                'update_price_data',
-                exchange=exchange.code
-            )
-
-            self.tracker.record_update(exchange.code, success=True)
-            logger.info(f"Completed scheduled update for {exchange.name}")
+            if success:
+                stats = manager.get_update_statistics()
+                logger.info(
+                    f"Update completed for {exchange.name}. "
+                    f"Added {stats['total_records']} records in "
+                    f"{stats['duration'].total_seconds():.1f} seconds"
+                )
+            else:
+                logger.warning(f"Update completed with errors for {exchange.name}")
 
         except Exception as e:
             logger.error(f"Error updating {exchange.name}: {str(e)}")
             self.tracker.record_update(exchange.code, success=False)
 
-            # Handle retry logic
             if self.tracker.should_retry(exchange.code):
                 logger.info(f"Will retry update for {exchange.name} later")
             else:

@@ -5,12 +5,12 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from django.db.models import QuerySet
 import numpy as np
-from fin_data_cl.models import PriceData, DividendData
+from fin_data_cl.models import PriceData, DividendData, Security
 
 
 class StockVisualizer:
-    def __init__(self, ticker: str):
-        self.ticker = ticker
+    def __init__(self, security: Security):
+        self.security = security
         self.figure = None
         self.price_data = None
         self.dividend_data = None
@@ -30,12 +30,12 @@ class StockVisualizer:
 
             # Load price data
             price_queryset = PriceData.objects.filter(
-                ticker=self.ticker,
+                security=self.security,
                 date__range=(start_date, end_date)
             ).order_by('date')
 
             if not price_queryset.exists():
-                self.errors.append(f"No price data found for ticker {self.ticker} in the specified date range")
+                self.errors.append(f"No price data found for security {self.security.full_symbol} in the specified date range")
                 return False
 
             # Convert queryset to DataFrame
@@ -63,7 +63,7 @@ class StockVisualizer:
 
             # Load dividend data
             dividend_queryset = DividendData.objects.filter(
-                ticker=self.ticker,
+                security=self.security,
                 date__range=(start_date, end_date)
             ).order_by('date')
 
@@ -71,6 +71,10 @@ class StockVisualizer:
                 self.dividend_data = pd.DataFrame.from_records(
                     dividend_queryset.values('date', 'amount', 'dividend_type')
                 )
+                if self.dividend_data.empty:
+                    self.errors.append("Dividend data exists but could not be loaded into the DataFrame.")
+                else:
+                    print(self.dividend_data)  # Debugging: check the content of the DataFrame
 
             return True
 
@@ -92,6 +96,9 @@ class StockVisualizer:
             return None
 
         try:
+            # Ensure dates are sorted for proper plotting
+            self.price_data.sort_values('date', inplace=True)
+
             # Create figure with secondary y-axis for volume and dividends
             fig = make_subplots(
                 rows=2 if show_volume else 1,
@@ -115,14 +122,11 @@ class StockVisualizer:
                 row=1, col=1
             )
 
+            # Add volume bars if enabled
             if show_volume and 'volume' in self.price_data.columns:
-                # Ensure volume values are valid
                 volume_data = self.price_data['volume'].fillna(0)
-
-                # Calculate colors based on price movement
                 colors = ['red' if close < open else 'green'
-                          for close, open in zip(self.price_data['close_price'],
-                                                 self.price_data['open_price'])]
+                          for close, open in zip(self.price_data['close_price'], self.price_data['open_price'])]
 
                 fig.add_trace(
                     go.Bar(
@@ -135,7 +139,7 @@ class StockVisualizer:
                     row=2, col=1
                 )
 
-            # Add dividend markers as semi-transparent bars
+            # Add dividend markers if available
             if self.dividend_data is not None and not self.dividend_data.empty:
                 dividend_colors = {1: 'rgba(0, 0, 255, 0.5)', 2: 'rgba(255, 165, 0, 0.5)', 3: 'rgba(128, 0, 128, 0.5)'}
                 for dividend_type, color in dividend_colors.items():
@@ -154,9 +158,9 @@ class StockVisualizer:
                             secondary_y=True
                         )
 
-            # Update layout
+            # Update layout for better appearance
             fig.update_layout(
-                title=title or f'{self.ticker} Stock Price with Dividends',
+                title=title or f'{self.security.ticker} Stock Price with Dividends',
                 height=height,
                 xaxis_rangeslider_visible=False,
                 template='plotly_white',
@@ -166,7 +170,7 @@ class StockVisualizer:
             )
 
             self.figure = fig
-            return fig
+            return fig.to_html(full_html=False)  # Convert to HTML
 
         except Exception as e:
             self.errors.append(f"Error creating chart: {str(e)}")

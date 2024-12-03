@@ -1,8 +1,22 @@
 from django.db import models
+from django.db.models import Manager
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from finriv.utils.exchanges import ExchangeRegistry
 from django.utils import timezone
+
+
+class SecurityManager(Manager):
+    def get_queryset(self):
+        return super().get_queryset().select_related('exchange')
+
+
+class PriceDataManager(Manager):
+    def get_data_in_range(self, security, start_date, end_date):
+        return self.filter(
+            security=security,
+            date__range=[start_date, end_date]
+        ).order_by('date')
 
 class Exchange(models.Model):
     """
@@ -93,6 +107,28 @@ class Security(models.Model):
         """Return the complete symbol including exchange suffix"""
         return f"{self.ticker}.{self.exchange.suffix}"
 
+    objects = SecurityManager()
+
+    def get_analysis_data(self, start_date, end_date):
+        """Get all analysis data for a security in date range"""
+        price_data = self.pricedata_set.filter(
+            date__range=[start_date, end_date]
+        ).order_by('date')
+
+        dividend_data = self.dividenddata_set.filter(
+            date__range=[start_date, end_date]
+        ).order_by('date')
+
+        return {
+            'dates': [p.date for p in price_data],
+            'prices': [p.close_price for p in price_data],
+            'open_prices': [p.open_price for p in price_data],
+            'high_prices': [p.high_price for p in price_data],
+            'low_prices': [p.low_price for p in price_data],
+            'volumes': [p.volume for p in price_data],
+            'dividends': list(dividend_data)
+        }
+
 
 class BaseFinancialData(models.Model):
     """
@@ -164,14 +200,6 @@ class FinancialReport(BaseFinancialData):
     metrics = models.JSONField()
     historical_changes = models.JSONField()
     future_outlook = models.JSONField()
-
-
-# class TickerData(models.Model):
-#     ticker = models.CharField(max_length=10)
-#
-#     class Meta:
-#         abstract = True
-
 class FinancialData(BaseFinancialData):
     revenue = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     net_profit = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
@@ -229,8 +257,9 @@ class PriceData(BaseFinancialData):
     low_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     close_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
     volume = models.BigIntegerField(null=True, blank=True)
+
+    objects = PriceDataManager()
 
 
 class FinancialRatio(BaseFinancialData):
@@ -251,24 +280,7 @@ class FinancialRatio(BaseFinancialData):
     quick_ratio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Quick Ratio
     dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield this year
     before_dividend_yield = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Dividend Yield previous year
-
-
-
-# class DividendSummary(BaseFinancialData): #Deprecated
-#     ticker = models.CharField(max_length=10)
-#     year = models.IntegerField()
-#     total_dividends = models.DecimalField(max_digits=20, decimal_places=2)
-#     dividend_count = models.IntegerField()
-#
-#     class Meta:
-#         unique_together = ('ticker', 'year')
-#         verbose_name = 'Dividend Summary'
-#         verbose_name_plural = 'Dividend Summaries'
-#         get_latest_by = 'year'  # Add this line
-#
-#     def __str__(self):
-#         return f"{self.ticker} - {self.year}"
-
+    price = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True) #Price used to calculate it
 
 class DividendData(BaseFinancialData):
     """

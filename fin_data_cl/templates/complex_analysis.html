@@ -26,6 +26,7 @@
                 <!-- Column headers with sorting functionality -->
                 <th class="sortable" data-ratio="ticker">Ticker</th>
                 <th class="sortable" data-ratio="date">Date</th>
+                <th class="sortable" data-ratio="price">Price</th>
                 <th class="sortable" data-ratio="pe_ratio">P/E Ratio</th>
                 <th class="sortable" data-ratio="pb_ratio">P/B Ratio</th>
                 <th class="sortable" data-ratio="ps_ratio">P/S Ratio</th>
@@ -146,7 +147,7 @@
                 } else {
                     // Populate the table body with the data
                     data.forEach(function(ratio) {
-                        let row = `<tr><td>${ratio.ticker}</td><td>${ratio.date}</td>`;
+                        let row = `<tr><td>${ratio.ticker}</td><td>${ratio.date}</td><td>${ratio.price}</td>`;
                         row += `<td>${ratio.pe_ratio !== undefined ? parseFloat(ratio.pe_ratio).toFixed(2) : 'N/A'}</td>`;
                         row += `<td>${ratio.pb_ratio !== undefined ? parseFloat(ratio.pb_ratio).toFixed(2) : 'N/A'}</td>`;
                         row += `<td>${ratio.ps_ratio !== undefined ? parseFloat(ratio.ps_ratio).toFixed(2) : 'N/A'}</td>`;

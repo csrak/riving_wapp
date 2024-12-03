@@ -17,7 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",
+    'django.contrib.staticfiles',
     'django_extensions',
     'management_commands',
 ]
@@ -69,8 +69,10 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = "/staticobjects/"
-# Default primary key field type
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / "static",  # Ensure this points to your static directory
+]# Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Logging Configuration
@@ -110,9 +112,11 @@ Q_CLUSTER = {
 }
 
 # settings.py
-PRICE_UPDATE_SETTINGS = {
-    'PRICE_UPDATE_INTERVAL': 30,  # minutes
-    'MIN_UPDATE_SPACING': 5,      # minimum minutes between updates
-    'MAX_UPDATE_ATTEMPTS': 3,     # per exchange
-    'MAX_CONSECUTIVE_ERRORS': 5,  # across all exchanges
-}
+PRICE_UPDATE_INTERVAL = int(os.getenv('PRICE_UPDATE_INTERVAL', 7200))  # minutes between updates
+MIN_UPDATE_SPACING = int(os.getenv('MIN_UPDATE_SPACING', 3000))  # minimum minutes between updates
+MAX_UPDATE_ATTEMPTS = int(os.getenv('MAX_UPDATE_ATTEMPTS', 3))  # max retry attempts per exchange
+MAX_CONSECUTIVE_ERRORS = int(os.getenv('MAX_CONSECUTIVE_ERRORS', 5))  # max errors before critical alert
+
+# Logging configuration for scheduler
+
+ANALYSIS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
