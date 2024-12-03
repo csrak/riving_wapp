@@ -11,7 +11,7 @@ class BaseFinancialSearchForm(forms.Form):
     Supports dynamic exchange-based security filtering and date-based queries.
     """
     exchange = forms.ModelChoiceField(
-        queryset=Exchange.objects.all(),
+        queryset=Exchange.objects.all().order_by('name'),  # Alphabetical order
         label='Select Exchange',
         required=True,
         widget=forms.Select(attrs={
@@ -49,69 +49,28 @@ class BaseFinancialSearchForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
 
-    class BaseFinancialSearchForm(forms.Form):
-        """Base form class for searching financial data with enhanced widget attributes."""
-
     def __init__(self, *args, model_class=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_class = model_class
 
-        # Get the prefix for proper attribute naming
-        prefix = kwargs.get('prefix', '')
-
-        # Enhanced exchange field
-        self.fields['exchange'].widget.attrs.update({
-            'class': 'form-control',
-            'data-dependent': 'security',
-            'data-initial': self.initial.get('exchange', ''),
-            'name': f"{prefix}-exchange" if prefix else "exchange"
-        })
-
-        # Enhanced security field
-        self.fields['security'].widget.attrs.update({
-            'class': 'form-control',
-            'data-dependent': 'year',
-            'data-initial': self.initial.get('security', ''),
-            'name': f"{prefix}-security" if prefix else "security"
-        })
-
-        # Enhanced year field
-        self.fields['year'].widget.attrs.update({
-            'class': 'form-control',
-            'data-dependent': 'month',
-            'data-initial': self.initial.get('year', ''),
-            'name': f"{prefix}-year" if prefix else "year"
-        })
-
-        # Enhanced month field
-        self.fields['month'].widget.attrs.update({
-            'class': 'form-control',
-            'data-initial': self.initial.get('month', ''),
-            'name': f"{prefix}-month" if prefix else "month"
-        })
-
-        # Filter exchanges based on available data
+        # Filter exchanges and order alphabetically
         if model_class:
             available_exchanges = Exchange.objects.filter(
                 security__in=Security.objects.filter(
                     Q(**{f'{model_class.__name__.lower()}_data__isnull': False})
                 )
-            ).distinct()
+            ).distinct().order_by('name')  # Ensure sorting alphabetically
             self.fields['exchange'].queryset = available_exchanges
 
-        # Get selected values from either POST data or initial data
-        selected_exchange = self.data.get(f'{self.prefix}-exchange') if self.prefix else self.data.get('exchange')
-        selected_exchange = selected_exchange or self.initial.get('exchange')
-
-        selected_security = self.data.get(f'{self.prefix}-security') if self.prefix else self.data.get('security')
-        selected_security = selected_security or self.initial.get('security')
+        selected_exchange = self.data.get('exchange') or self.initial.get('exchange')
+        selected_security = self.data.get('security') or self.initial.get('security')
 
         # Populate securities dropdown if exchange is selected
         if selected_exchange:
             securities_queryset = Security.objects.filter(
                 exchange_id=selected_exchange,
                 is_active=True
-            )
+            ).order_by('name')  # Ensure sorting alphabetically
             if model_class:
                 securities_queryset = securities_queryset.filter(
                     Q(**{f'{model_class.__name__.lower()}_data__isnull': False})
@@ -131,8 +90,7 @@ class BaseFinancialSearchForm(forms.Form):
             ]
 
             # Set month choices if year is selected
-            selected_year = self.data.get(f'{self.prefix}-year') if self.prefix else self.data.get('year')
-            selected_year = selected_year or self.initial.get('year')
+            selected_year = self.data.get('year') or self.initial.get('year')
 
             if selected_year:
                 months = [
@@ -140,11 +98,10 @@ class BaseFinancialSearchForm(forms.Form):
                     if date.year == int(selected_year)
                 ]
                 self.fields['month'].choices = [('', 'Select Month')] + [
-                    (month, f"{month:02d}") for month in sorted(months)
+                    (month, f"{month:02d}") for month in sorted(months)  # Numeric sorting
                 ]
             else:
                 self.fields['month'].choices = [('', 'Select Month')]
-
     def get_report_data(self):
         """
         Retrieve the financial data based on form selections.

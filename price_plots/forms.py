@@ -16,5 +16,6 @@ class StockRangeForm(forms.Form):
 
     def __init__(self, securities, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Dynamically populate the security choices
-        self.fields['security'].choices = [(s.id, f"{s.ticker} - {s.name}") for s in securities]
+        # Dynamically populate and sort the security choices
+        sorted_securities = sorted(securities, key=lambda s: s.name)  # Sort by the `name` field
+        self.fields['security'].choices = [(s.id, f"{s.ticker} - {s.name}") for s in sorted_securities]

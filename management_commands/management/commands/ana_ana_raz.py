@@ -1,9 +1,10 @@
 # my_app/management/commands/run_my_script.py
 from django.core.management.base import BaseCommand
-#from finriv.utils.scrapping_classes import test as test_ticker
+# from finriv.utils.scrapping_classes import test as test_ticker
 from django.conf import settings
+
 BASE_DIR = settings.BASE_DIR
-from finriv.utils.scrapping_classes import Ticker,TestCmfScraping
+from finriv.utils.scrapping_classes import Ticker, TestCmfScraping
 from fin_data_cl.models import FinancialReport
 
 G_datafold = BASE_DIR / 'media' / 'Data' / 'Chile'
@@ -15,7 +16,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import re
 import json
-#from llama_index.llms.ollama import Ollama
+# from llama_index.llms.ollama import Ollama
 from fin_data_cl.models import Exchange, Security
 from dataclasses import dataclass
 from typing import List, Optional
@@ -34,12 +35,18 @@ from pydantic import BaseModel, Field
 from openai import OpenAI as OpenAIog
 from llama_index.program.openai import OpenAIPydanticProgram
 import logging
+
+
 def get_api_key(file_path):
     with open(file_path, 'r') as file:
         api_key = file.read().strip()  # Strip removes any extra spaces or newlines
     return api_key
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
 # class BaseModel:
 #     def to_json(self):
 #         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -52,15 +59,19 @@ class FinancialMetrics(BaseModel):
     debt_to_equity: str
     earnings_per_share: str
     free_cash_flow: str
+
+
 class HistoricalChange(BaseModel):
     category: str
     description: str
     impact: str
 
+
 class Risk(BaseModel):
     category: str
     description: str
     potential_impact: str
+
 
 class FutureOutlook(BaseModel):
     category: str
@@ -75,19 +86,19 @@ class FinancialAnalysis(BaseModel):
     historical_changes: list[HistoricalChange]
     future_outlook: list[FutureOutlook]
 
+
 class FinancialDocumentAnalyzer:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         # Initialize LlamaIndex settings
-        self.api_key=api_key
+        self.api_key = api_key
         self.llm = OpenAI(model='gpt-4o-mini', api_key=api_key)
-        embed_model = OpenAIEmbedding(model="text-embedding-3-small", api_key=api_key)
+        embed_model = OpenAIEmbedding(model="text-embedding-3-large", api_key=api_key)
         # Update settings
         Settings.llm = self.llm
         Settings.embed_model = embed_model
 
         self.node_parser = SimpleNodeParser.from_defaults()
         self._init_query_templates()
-
 
         # Define query templates
 
@@ -97,16 +108,16 @@ class FinancialDocumentAnalyzer:
             "business_overview": """
                 Extract a complete business overview from the financial document.
                 Focus on: main business activities, revenue streams, and market position.
-                Be specific and include key details about the company's operations, including countries and regions. Format it in a readable way.Write in english. If anything is missing say it is missing in the document..
+                Be specific and include key details about the company's operations, including countries and regions. Format it in a readable way. Always write in english. If anything is missing say it is missing in the document.
             """,
 
             "risks": """
                 List the main risks mentioned in the financial document.
-                For each risk, specify:
-                1. Risk Category (must be one of: Operational, Financial, Market, Regulatory)
+                For each risk, specify a particular name and:
+                1. Risk Category
                 2. Detailed description of the risk
                 3. Potential impact on the business
-                Format each risk on a new line starting with the category. Go in detail about said risks, specially numerical aspects, dates and names.  Write in english.If anything is missing say it is missing in the document.
+                Go in detail about said risks, specially numerical aspects, data, dates and names.  Write in english.If anything is missing say it is missing in the document.
             """,
 
             "metrics": """
@@ -118,7 +129,6 @@ class FinancialDocumentAnalyzer:
                 - Debt to Equity Ratio
                 - Earnings per Share
                 - Free Cash Flow
-                Provide only the numbers and currency units, with each metric on a new line. Write in english.
             """,
 
             "changes": """
@@ -133,15 +143,14 @@ class FinancialDocumentAnalyzer:
             "outlook": """
                 Extract future outlook information from the document.
                 For each point:
-                1. Specify the category
-                2. Describe the expected change or development
-                3. Indicate likelihood as: High, Medium, or Low
-                List each point on a new line. Be very detailed about these outlooks.Write in english.If anything is missing say it is missing in the document.
+                1. Describe the expected change or development
+                2. Detail
+                 Be very detailed about these outlooks. Write in english. If anything is missing say it is missing in the document.
             """
         }
 
     @staticmethod
-    def make_text_query( text):
+    def make_text_query(text):
         return f"""Given the following response:
 
 \"\"\"
@@ -149,10 +158,11 @@ class FinancialDocumentAnalyzer:
 \"\"\"
 
 
-Structure the output corectly, do not omit any informatiion in your response. Make sure all the information is conveyed, if information belongs to more than one classification put it on both. Make sure it is clear and concise. 
+Structure the output correctly. Never omit any information that was present in the original. Make sure all the information is conveyed, if information belongs to more than one classification put it anyway. Make sure it is clear and concise.
+Format clearly with markdown. 
 """
-    @staticmethod
 
+    @staticmethod
     def create_index_for_document(file_path: str) -> Optional[VectorStoreIndex]:
         try:
             reader = SimpleDirectoryReader(input_files=[file_path])
@@ -161,9 +171,10 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         except Exception as e:
             logging.error(f"Error creating index for {file_path}: {e}")
             return None
+
     def analyze_document(self, document: str):
         # Create document and index
-        #document = Document(text=document_text)
+        # document = Document(text=document_text)
         index = self.create_index_for_document(document)
         # Create query engine
         query_engine = index.as_query_engine()
@@ -179,9 +190,9 @@ Structure the output corectly, do not omit any informatiion in your response. Ma
         client = OpenAIog(api_key=self.api_key)
         completion = client.beta.chat.completions.parse(model="gpt-4o-mini", messages=[
             {"role": "system",
-             "content": "You are an information retrieval and classification tool. You also know how to classify and understand financial information."},
+             "content": "You are an information retrieval and classification tool. You also know how to classify and understand financial information. You always write using markdown.You always translate non english to english. "},
             {"role": "user", "content": self.make_text_query(text_query)}], response_format=FinancialAnalysis)
-        #if completion.refusal:
+        # if completion.refusal:
         #    print(completion.refusal)
         #    exit()
         answer = completion.choices[0].message.parsed
@@ -258,70 +269,158 @@ Future Outlook:
             for item in outlook
         ])
 
+
 class FileSearcher:
-    def __init__(self, datafold_path, use_llamaindex=True):
+    def __init__(self, datafold_path, use_llamaindex=True, reuse_existing=False, reuse_file=None, save_json=False):
         self.datafold_path = Path(datafold_path)
         self.all_tickers = Ticker.get_all_tickers_as_dataframe()
         self.use_llamaindex = use_llamaindex
+        self.reuse_existing = reuse_existing
+        self.reuse_file = Path(reuse_file) if reuse_file else None
+        self.save_json = save_json
         self.results_df = pd.DataFrame(columns=['Ticker', 'Year', 'Month', 'Response'])
+        self.processed_tickers = set()  # Track processed tickers
+
+    def strip_tranche_suffix(self, ticker):
+        return ticker.split('-')[0]  # Extract the main ticker
+
+    def search_files_for_tickers(self, start_year=2023, end_year=None, securities=None):
+        if self.all_tickers is None:
+            raise ValueError("Tickers dataframe is not loaded. Initialize all_tickers first.")
+        if end_year is None:
+            end_year = int(datetime.now().year)
+        now = datetime.now()
+
+        for _, row in self.all_tickers.iterrows():
+            ticker = row['Ticker']
+            main_ticker = self.strip_tranche_suffix(ticker)
+
+            # Skip processing if the main ticker has already been processed
+            if main_ticker in self.processed_tickers:
+                print(f"Skipping {ticker}, already processed main ticker {main_ticker}.")
+                continue
+
+            for folder in self.datafold_path.iterdir():
+                if folder.is_dir() and '-' in folder.name:  # Assuming folders are named as 'MM-YYYY'
+                    month, year = folder.name.split('-')
+                    if start_year <= int(year) <= end_year:
+                        date = datetime.strptime(f"01-{month}-{year}", "%d-%m-%Y")
+                        security = securities.filter(ticker=ticker).first()
+
+                        if not FinancialReport.objects.filter(security=security, date=date).exists():
+                            if self.reuse_existing and self.reuse_file:
+                                analysis = self.load_analysis_from_file(ticker, folder.name)
+                                if analysis:
+                                    self.save_response(security, date, analysis, now)
+                                    continue
+
+                            file_name = f"Analisis_{ticker}_{folder.name}.pdf"
+                            file_path = folder / file_name
+
+                            if file_path.exists():
+                                print(f"Parsing new file: {file_path}")
+                                response = self.parse_pdf(file_path)
+                                if response:
+                                    self.save_response(security, date, response, now)
+                                    if self.save_json:
+                                        self.save_analysis_to_file(response, ticker, folder.name)
+                                    # Mark the main ticker as processed
+                                    self.processed_tickers.add(main_ticker)
+                        else:
+                            print(f"The {ticker} for year {year} and month {month} already exists in database, skipping.")
+
+
+
+    def load_analysis_from_file(self, ticker, folder_name):
+        if self.reuse_file.is_file():
+            with open(self.reuse_file, 'r') as file:
+                analysis = json.load(file)
+            return analysis
+        elif self.reuse_file.is_dir():
+            file_path = self.reuse_file / f"Analysis_{ticker}_{folder_name}.json"
+            if file_path.exists():
+                with open(file_path, 'r') as file:
+                    analysis = json.load(file)
+                return analysis
+        return None
+
+    def save_analysis_to_file(self, analysis, ticker, folder_name):
+        output_dir = self.datafold_path / "processed_results"
+        output_dir.mkdir(exist_ok=True)
+        output_file = output_dir / f"Analysis_{ticker}_{folder_name}.json"
+        try:
+            metrics = dict(analysis.metrics)
+        except TypeError:
+            metrics = ["Missing"]
+        with open(output_file, 'w') as file:
+            json.dump({
+                'business_overview': analysis.business_overview,
+                'risks': [dict(r) for r in analysis.risks],
+                'metrics': metrics,
+                'historical_changes': [dict(r) for r in analysis.historical_changes],
+                'future_outlook': [dict(r) for r in analysis.future_outlook],
+            }, file)
 
     def load_tickers(self):
         # Get all tickers as dataframe
         self.all_tickers = Ticker.get_all_tickers_as_dataframe()
 
-    def search_files_for_tickers(self, start_year = 2023, securities=None):
-        if self.all_tickers is None:
-            raise ValueError("Tickers dataframe is not loaded. Initialize all_tickers first.")
-        now= datetime.now()
-        # Iterate through each ticker
-        for _, row in self.all_tickers.iterrows():
-            ticker = row['Ticker']
-
-            # Iterate through each folder in datafold_path
-            for folder in self.datafold_path.iterdir():
-                if folder.is_dir() and '-' in folder.name:  # Assuming folders are named as 'MM-YYYY'
-                    # Extract month and year from folder name
-                    month, year = folder.name.split('-')
-                    if int(year) >= start_year:
-                        # Construct expected filename
-                        date = datetime.strptime(f"01-{month}-{year}", "%d-%m-%Y")
-                        security = securities.filter(ticker=ticker).first()
-                        if not FinancialReport.objects.filter(security=security,date= date).exists():
-                            file_name = f"Analisis_{ticker}_{folder.name}.pdf"
-                            file_path = folder / file_name
-
-                            # Check if the file exists
-                            if file_path.exists():
-                                print(f"File found: {file_path}")
-                                response = self.parse_pdf(file_path)
-                                if response:
-                                    self.save_response(security, date, response, now)
-                        else:
-                            print(f"The {ticker} for year {year} and month {month} already exists in database, skipping.")
-                        #else:
-                        #    print(f"File not found: {file_name} in {folder}")
+    # def search_files_for_tickers(self, start_year=2023, end_year=None, securities=None):
+    #     if self.all_tickers is None:
+    #         raise ValueError("Tickers dataframe is not loaded. Initialize all_tickers first.")
+    #     if end_year is None:
+    #         end_year = int(datetime.now().year)
+    #     now = datetime.now()
+    #     # Iterate through each ticker
+    #     for _, row in self.all_tickers.iterrows():
+    #         ticker = row['Ticker']
+    #         # Iterate through each folder in datafold_path
+    #         for folder in self.datafold_path.iterdir():
+    #             if folder.is_dir() and '-' in folder.name:  # Assuming folders are named as 'MM-YYYY'
+    #                 # Extract month and year from folder name
+    #                 month, year = folder.name.split('-')
+    #                 if start_year <= int(year) <= end_year:
+    #                     # Construct expected filename
+    #                     date = datetime.strptime(f"01-{month}-{year}", "%d-%m-%Y")
+    #                     security = securities.filter(ticker=ticker).first()
+    #                     if not FinancialReport.objects.filter(security=security, date=date).exists():
+    #                         file_name = f"Analisis_{ticker}_{folder.name}.pdf"
+    #                         file_path = folder / file_name
+    #
+    #                         # Check if the file exists
+    #                         if file_path.exists():
+    #                             print(f"File found: {file_path}")
+    #                             response = self.parse_pdf(file_path)
+    #                             if response:
+    #                                 self.save_response(security, date, response, now)
+    #                     else:
+    #                         print(
+    #                             f"The {ticker} for year {year} and month {month} already exists in database, skipping.")
+    #                     # else:
+    #                     #    print(f"File not found: {file_name} in {folder}")
 
     def parse_pdf(self, file_path):
         retries = 3
         for attempt in range(retries):
-                with fitz.open(file_path) as pdf_file:
-                    text_content = ""
-                    # Extract text from each page
-                    for page_num in range(pdf_file.page_count):
-                        page = pdf_file.load_page(page_num)
-                        text_content += page.get_text("text") + "\n"
+            with fitz.open(file_path) as pdf_file:
+                text_content = ""
+                # Extract text from each page
+                for page_num in range(pdf_file.page_count):
+                    page = pdf_file.load_page(page_num)
+                    text_content += page.get_text("text") + "\n"
 
-                    # Pre-process text for LLM
-                    preprocessed_text = self.preprocess_text(text_content)
-                    # Choose parsing method
-                    if self.use_llamaindex:
-                        analyzer = FinancialDocumentAnalyzer(api_key=get_api_key(G_root_dir / 'api_key'))
+                # Pre-process text for LLM
+                preprocessed_text = self.preprocess_text(text_content)
+                # Choose parsing method
+                if self.use_llamaindex:
+                    analyzer = FinancialDocumentAnalyzer(api_key=get_api_key(G_root_dir / 'api_key'))
 
-                        # Analyze document
-                        analysis = analyzer.analyze_document(file_path)
+                    # Analyze document
+                    analysis = analyzer.analyze_document(file_path)
 
-                        if analysis:
-                            return analysis
+                    if analysis:
+                        return analysis
+
     def preprocess_text(self, text):
         # Remove extra whitespace and line breaks
         text = re.sub(r'\s+', ' ', text).strip()
@@ -344,18 +443,19 @@ class FileSearcher:
             security=security,
             created_at=now,
             updated_at=now,
-            date= date,
+            date=date,
             defaults={
                 'business_overview': analysis.business_overview,
                 'risks': [dict(r) for r in analysis.risks],
-                'metrics':metrics ,
+                'metrics': metrics,
                 'historical_changes': [dict(r) for r in analysis.historical_changes],
                 'future_outlook': [dict(r) for r in analysis.future_outlook],
             }
         )
         financial_report.save()
-        #self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
+        # self.results_df.to_csv(G_datafold / 'debug_responses.csv', index=False)
         return
+
     def _format_response_as_string(self, financial_analysis):
         def format_list(items: List[BaseModel], title: str) -> str:
             return f"\n{title}:\n" + "\n".join(f"- {item.to_json()}" for item in items)
@@ -368,6 +468,7 @@ class FileSearcher:
         result += format_list(financial_analysis.future_outlook, "Future Outlook")
 
         return result
+
     def query_llamaindex(self, preprocessed_text):
         # Use OpenAI's GPT model to query the document
         try:
@@ -375,7 +476,8 @@ class FileSearcher:
 
             # Formulate the query
             messages = [
-                ChatMessage(role="system", content="You are an expert financial document analyst. You give very detailed and long answers for each element and focus on finding unusual information."),
+                ChatMessage(role="system",
+                            content="You are an expert financial document analyst. You give very detailed and long answers for each element and focus on finding unusual information."),
                 ChatMessage(role="user", content=(
                     "Please parse the following document and determine the following: \n"
                     "1. Main Risks listed by the company. \n"
@@ -417,8 +519,11 @@ class FileSearcher:
         except Exception as e:
             print(f"Failed to query Ollama (Llama3): {e}")
             return None
+
+
 class Command(BaseCommand):
     help = 'Run the utility script'
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--dry-run',
@@ -439,7 +544,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--start-year',
             type=int,
+            required=True,
             help='The year to start processing quarters from (e.g., 2022)'
+        )
+        parser.add_argument(
+            '--end-year',
+            type=int,
+            help='The year to end processing quarters from (e.g., 2022)',
+            default=None,  # Set the default value here
         )
         parser.add_argument(
             '--exchange',
@@ -447,30 +559,39 @@ class Command(BaseCommand):
             required=True,
             help='Exchange code to update (e.g., NYSE)'
         )
+        parser.add_argument(
+            '--reuse-file',
+            type=str,
+            help='Path to a specific file or directory containing pre-analyzed results'
+        )
+        parser.add_argument(
+            '--save-json',
+            action='store_true',
+            help='Save analysis results as JSON files'
+        )
     def handle(self, *args, **kwargs):
-        self.stdout.write('Running utility script...')
-        #test_ticker()
-        #suite = unittest.TestLoader().loadTestsFromTestCase(TestCmfScraping)
+        reuse_file = kwargs.get('reuse_file', None)
+        if reuse_file is not None:
+            reuse_existing = True
+        else:
+            reuse_existing = False
+        save_json = kwargs.get('save_json', False)
+        searcher = FileSearcher(
+            G_datafold,
+            use_llamaindex=True,
+            reuse_existing=reuse_existing,
+            reuse_file=reuse_file,
+            save_json=save_json
+        )
 
-        # Run the test suite
-        #unittest.TextTestRunner(verbosity=2).run(suite)
-        searcher = FileSearcher(G_datafold, use_llamaindex=True)
         start_year = kwargs['start_year']
+        end_year = kwargs.get('end_year', start_year)
         exchange_code = kwargs['exchange'].upper()
         exchange = Exchange.objects.get(code=exchange_code)
-        securities = Security.objects.filter(
-            exchange=exchange,
-            is_active=True)
-        print(start_year)
-        if start_year:
-            searcher.search_files_for_tickers(start_year=start_year, securities=securities)
-        else:
-            print("Specify start year with --start-year")
-            return
-        #searcher.search_files_for_tickers()
-        # Optionally save the results to a CSV file
-        output_file = G_datafold/"results.csv"
-        searcher.results_df.to_csv(output_file, index=False)
-        print(f"Results saved to {output_file}")
-        self.stdout.write(self.style.SUCCESS('Script ran successfully!'))
+        securities = Security.objects.filter(exchange=exchange, is_active=True)
 
+        searcher.search_files_for_tickers(start_year=start_year, end_year=end_year, securities=securities)
+
+        output_file = G_datafold / "results_4o_2.csv"
+        searcher.results_df.to_csv(output_file, index=False)
+        self.stdout.write(self.style.SUCCESS(f'Results saved to {output_file}'))

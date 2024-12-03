@@ -1,9 +1,10 @@
 
-from finriv.settings import BASE_DIR
 import logging
 from requests.exceptions import RequestException
 import datetime
 # Set up logging for detailed debugging
+from django.conf import settings
+BASE_DIR = settings.BASE_DIR
 logging.basicConfig(level=logging.DEBUG)
 G_datafold = BASE_DIR / 'media' / 'Data' / 'Chile'
 G_root_dir = BASE_DIR

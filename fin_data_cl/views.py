@@ -23,7 +23,7 @@ def get_securities_for_exchange(request, exchange_id):
     securities = Security.objects.filter(
         exchange_id=exchange_id,
         is_active=True
-    )
+    ).order_by('name')  # Ensure alphabetical order
 
     return JsonResponse([
         {"id": security.id, "name": security.name}
@@ -45,16 +45,13 @@ def get_years_for_security(request, security_id):
     """Get available years for a security, handling both reports and risks."""
     model = RiskComparison if 'risks' in request.path else FinancialReport
 
-    print(f"Using model: {model.__name__}")  # Debug print
-
     dates = model.objects.filter(
         security_id=security_id
     ).dates('date', 'month', order='DESC')
 
-    years = sorted(set(date.year for date in dates), reverse=True)
-    print(f"Found years: {years}")  # Debug print
-
+    years = sorted(set(date.year for date in dates), reverse=True)  # Reverse chronological order
     return JsonResponse({"years": years})
+
 
 # def get_months_for_year(request, security_id, year):
 #     """Get available months for a security and year, handling both reports and risks."""
@@ -72,17 +69,13 @@ def get_months_for_year(request, security_id, year):
     """Get available months for a security and year, handling both reports and risks."""
     model = RiskComparison if 'risks' in request.path else FinancialReport
 
-    print(f"Getting months for security {security_id}, year {year} using model {model.__name__}")
-
     dates = model.objects.filter(
         security_id=security_id,
         date__year=year
     ).dates('date', 'month', order='DESC')
 
-    months = [date.month for date in dates]
-    print(f"Found months: {months}")
-
-    return JsonResponse({"months": sorted(months)})  # Sort months for consistency
+    months = sorted([date.month for date in dates])  # Ensure ascending order
+    return JsonResponse({"months": months})
 
 
 # View functions using the generalized search view
@@ -407,8 +400,10 @@ def get_metrics(request, ticker, metric_name):
     if metric_name not in [field.name for field in FinancialData._meta.get_fields() if field.name not in ['id', 'date', 'ticker']]:
         return JsonResponse({'error': 'Invalid metric name'}, status=400)
 
-    data = FinancialData.objects.filter(ticker=ticker).values('date', metric_name)
+    data = FinancialData.objects.filter(ticker=ticker).values('date', metric_name).order_by('date')  # Ensure chronological order
     return JsonResponse(list(data), safe=False)
+
+
 
 def metric_plotter(request):
     tickers = FinancialData.objects.values_list('ticker', flat=True).distinct()
@@ -432,8 +427,11 @@ def get_data(request):
 
 def ticker_suggestions(request):
     query = request.GET.get('query', '')
-    suggestions = FinancialData.objects.filter(ticker__icontains=query).values_list('ticker', flat=True).distinct()
+    suggestions = FinancialData.objects.filter(
+        ticker__icontains=query
+    ).values_list('ticker', flat=True).distinct().order_by('ticker')  # Alphabetical order
     return JsonResponse(list(suggestions), safe=False)
+
 
 def about(request):
     return render(request, 'about.html')

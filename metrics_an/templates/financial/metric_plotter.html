@@ -1,0 +1,222 @@
+{% extends "fin_data_cl/base.html" %}
+
+{% block title %}Metric Plotter - Financial Analysis Platform{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <h2 class="h4 mb-0">Financial Metric Plotter</h2>
+    </div>
+    <div class="card-body">
+        <div class="row mb-4">
+            <!-- Controls -->
+            <div class="col-md-4">
+                <div class="form-group mb-3">
+                    <label for="exchange-select" class="form-label">Exchange</label>
+                    <select class="form-select" id="exchange-select">
+                        <option value="">Select Exchange</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group mb-3">
+                    <label for="security-select" class="form-label">Security</label>
+                    <select class="form-select" id="security-select" disabled>
+                        <option value="">Select Security</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group mb-3">
+                    <label for="metric-select" class="form-label">Add Metric</label>
+                    <select class="form-select" id="metric-select" disabled>
+                        <option value="">Select Metric</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Metrics Display -->
+        <div id="active-metrics" class="mb-4">
+            <!-- Active metrics will be added here dynamically -->
+        </div>
+
+        <!-- Plot Container -->
+        <div id="plot-container" style="height: 600px;">
+            <!-- Plotly chart will be rendered here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const METRIC_OPTIONS = {
+        'revenue': 'Revenue',
+        'net_profit': 'Net Profit',
+        'operating_profit': 'Operating Profit',
+        'ebit': 'EBIT',
+        'cash': 'Cash',
+        'assets': 'Total Assets',
+        'equity': 'Total Equity',
+        'liabilities': 'Total Liabilities',
+        'market_cap': 'Market Cap',
+        'operating_eps': 'Operating EPS'
+    };
+
+    const COLORS = ['#2196F3', '#4CAF50', '#F44336'];
+    let activeMetrics = [];
+
+    // Initialize the interface
+    document.addEventListener('DOMContentLoaded', function() {
+        loadExchanges();
+        setupEventListeners();
+    });
+
+    function loadExchanges() {
+        fetch('/api/exchanges/')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('exchange-select');
+                data.forEach(exchange => {
+                    const option = new Option(exchange.name, exchange.code);
+                    select.add(option);
+                });
+            });
+    }
+
+    function setupEventListeners() {
+        // Exchange selection
+        document.getElementById('exchange-select').addEventListener('change', function(e) {
+            const securitySelect = document.getElementById('security-select');
+            securitySelect.disabled = !e.target.value;
+            securitySelect.innerHTML = '<option value="">Select Security</option>';
+            
+            if (e.target.value) {
+                loadSecurities(e.target.value);
+            }
+        });
+
+        // Security selection
+        document.getElementById('security-select').addEventListener('change', function(e) {
+            const metricSelect = document.getElementById('metric-select');
+            metricSelect.disabled = !e.target.value;
+            metricSelect.innerHTML = '<option value="">Select Metric</option>';
+            
+            if (e.target.value) {
+                populateMetricOptions();
+            }
+        });
+
+        // Metric selection
+        document.getElementById('metric-select').addEventListener('change', function(e) {
+            if (e.target.value && activeMetrics.length < 3) {
+                addMetric(e.target.value);
+                e.target.value = '';
+            }
+        });
+    }
+
+    function loadSecurities(exchangeCode) {
+        fetch(`/api/securities/${exchangeCode}/`)
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('security-select');
+                data.forEach(security => {
+                    const option = new Option(`${security.ticker} - ${security.name}`, security.id);
+                    select.add(option);
+                });
+            });
+    }
+
+    function populateMetricOptions() {
+        const select = document.getElementById('metric-select');
+        select.innerHTML = '<option value="">Select Metric</option>';
+        
+        Object.entries(METRIC_OPTIONS).forEach(([value, label]) => {
+            if (!activeMetrics.includes(value)) {
+                const option = new Option(label, value);
+                select.add(option);
+            }
+        });
+    }
+
+    function addMetric(metricName) {
+        if (activeMetrics.length >= 3) return;
+        
+        activeMetrics.push(metricName);
+        updateActiveMetricsDisplay();
+        loadAndUpdatePlot();
+    }
+
+    function removeMetric(metricName) {
+        activeMetrics = activeMetrics.filter(m => m !== metricName);
+        updateActiveMetricsDisplay();
+        loadAndUpdatePlot();
+        populateMetricOptions();
+    }
+
+    function updateActiveMetricsDisplay() {
+        const container = document.getElementById('active-metrics');
+        container.innerHTML = '';
+        
+        activeMetrics.forEach((metric, index) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-primary me-2 mb-2';
+            badge.style.cursor = 'pointer';
+            badge.innerHTML = `${METRIC_OPTIONS[metric]} <i class="fas fa-times"></i>`;
+            badge.onclick = () => removeMetric(metric);
+            container.appendChild(badge);
+        });
+    }
+
+    function loadAndUpdatePlot() {
+        const securityId = document.getElementById('security-select').value;
+        if (!securityId || activeMetrics.length === 0) return;
+
+        const promises = activeMetrics.map(metric => 
+            fetch(`/api/metrics/${securityId}/?metric=${metric}`).then(r => r.json())
+        );
+
+        Promise.all(promises).then(results => {
+            const traces = results.map((data, index) => ({
+                x: data.dates,
+                y: data.values,
+                name: METRIC_OPTIONS[activeMetrics[index]],
+                type: 'scatter',
+                yaxis: `y${index + 1}`,
+                line: { color: COLORS[index] }
+            }));
+
+            const layout = {
+                height: 600,
+                showlegend: true,
+                xaxis: { domain: [0.1, 0.9] },
+                margin: { l: 60, r: 60, t: 30, b: 30 }
+            };
+
+            // Configure multiple y-axes
+            traces.forEach((_, index) => {
+                if (index === 0) {
+                    layout.yaxis = {
+                        title: METRIC_OPTIONS[activeMetrics[0]],
+                        titlefont: { color: COLORS[0] },
+                        tickfont: { color: COLORS[0] }
+                    };
+                } else {
+                    layout[`yaxis${index + 1}`] = {
+                        title: METRIC_OPTIONS[activeMetrics[index]],
+                        titlefont: { color: COLORS[index] },
+                        tickfont: { color: COLORS[index] },
+                        overlaying: 'y',
+                        side: index === 1 ? 'right' : 'right',
+                        position: index === 1 ? 0.95 : 1
+                    };
+                }
+            });
+
+            Plotly.newPlot('plot-container', traces, layout);
+        });
+    }
+</script>
+{% endblock %}

@@ -24,13 +24,13 @@ class StockAnalysisView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['exchanges'] = Exchange.objects.all()
+        context['exchanges'] = Exchange.objects.all().order_by('name')  # Alphabetically order exchanges
         return context
 
 
 class ExchangeViewSet(ReadOnlyModelViewSet):
     """API endpoint for exchanges"""
-    queryset = Exchange.objects.all()
+    queryset = Exchange.objects.all().order_by('name')  # Alphabetically order exchanges
     serializer_class = ExchangeSerializer
 
 
@@ -118,7 +118,7 @@ class SecurityViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SecuritySerializer
 
     def get_queryset(self):
-        queryset = Security.objects.filter(is_active=True)
+        queryset = Security.objects.filter(is_active=True).order_by('name')  # Alphabetically order securities
         exchange_code = self.request.query_params.get('exchange', None)
 
         if exchange_code:
