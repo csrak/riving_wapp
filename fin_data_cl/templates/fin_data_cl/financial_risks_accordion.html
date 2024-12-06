@@ -1,73 +1,44 @@
-<div class="accordion" id="financialReportAccordion{{ side_name }}">
-    <!-- New Risks Section -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="headingOverview{{ side_name }}">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#collapseOverview{{ side_name }}"
-                    aria-expanded="true"
-                    aria-controls="collapseOverview{{ side_name }}">
-                New Risks
-            </button>
-        </h2>
-        <div id="collapseOverview{{ side_name }}"
-             class="accordion-collapse collapse show"
-             aria-labelledby="headingOverview{{ side_name }}"
-             data-bs-parent="#financialReportAccordion{{ side_name }}">
-            <div class="accordion-body">
-                {% for risk in report.new_risks %}
-                    <p>{{ risk }}</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+<-- This is the template for the financial risk accordeon section. -->
 
-    <!-- Old Risks Section -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="headingRisks{{ side_name }}">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#collapseRisks{{ side_name }}"
-                    aria-expanded="false"
-                    aria-controls="collapseRisks{{ side_name }}">
-                Old Risks
-            </button>
-        </h2>
-        <div id="collapseRisks{{ side_name }}"
-             class="accordion-collapse collapse"
-             aria-labelledby="headingRisks{{ side_name }}"
-             data-bs-parent="#financialReportAccordion{{ side_name }}">
-            <div class="accordion-body">
-                {% for risk in report.old_risks %}
-                    {% if risk|wordcount >= 5 %}
-                        <p>{{ risk }}</p>
-                        <hr>
-                    {% endif %}
-                {% endfor %}
+{% if sections %}
+    <div class="accordion" id="financialReportAccordion{{ side }}">
+        {% for section in sections %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ section.id }}{{ side }}">
+                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapse{{ section.id }}{{ side }}"
+                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                            aria-controls="collapse{{ section.id }}{{ side }}">
+                        {{ section.title }}
+                    </button>
+                </h2>
+                <div id="collapse{{ section.id }}{{ side }}"
+                     class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                     aria-labelledby="heading{{ section.id }}{{ side }}"
+                     data-bs-parent="#financialReportAccordion{{ side }}">
+                    <div class="accordion-body">
+                        {% for item in section.items %}
+                            {% if item|wordcount >= 5 %}
+                                <div class="risk-item mb-3">
+                                    {% if section.id == 'Changes' %}
+                                        <p><strong>Description:</strong> {{ item }}</p>
+                                    {% else %}
+                                        <p>{{ item }}</p>
+                                    {% endif %}
+                                </div>
+                                {% if not forloop.last %}<hr>{% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if not section.items %}
+                            <p class="text-muted">No {{ section.title|lower }} found.</p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-        </div>
+        {% endfor %}
     </div>
-
-    <!-- Risk Changes Section -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="headingChanges{{ side_name }}">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#collapseChanges{{ side_name }}"
-                    aria-expanded="false"
-                    aria-controls="collapseChanges{{ side_name }}">
-                Risk Changes
-            </button>
-        </h2>
-        <div id="collapseChanges{{ side_name }}"
-             class="accordion-collapse collapse"
-             aria-labelledby="headingChanges{{ side_name }}"
-             data-bs-parent="#financialReportAccordion{{ side_name }}">
-            <div class="accordion-body">
-                {% for change in report.modified_risks %}
-                    {% if change|wordcount >= 5 %}
-                        <p><strong>Description:</strong> {{ change }}</p>
-                        <hr>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
+{% else %}
+    <p class="text-muted">No sections available to display.</p>
+{% endif %}

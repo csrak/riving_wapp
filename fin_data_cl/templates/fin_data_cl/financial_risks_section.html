@@ -1,35 +1,46 @@
+<-- This is the template for the financial risk report section. -->
 <div class="financial-report-section" data-form-type="risks">
-    <h1 class="mb-4">Search Financial Risk #{{ number }}</h1>
+    <h1 class="mb-4">{% if side_name %}{{ side_name }} {% endif %}Financial Risk Report {% if number %}#{{ number }}{% endif %}</h1>
 
-    <form method="post" class="mb-4" data-form-id="{{ form_id }}">
+    <form method="post" class="mb-4" data-form-id="{{ form_id }}" id="form-{{ form_id }}">
         {% csrf_token %}
         <input type="hidden" name="form_id" value="{{ form_id }}">
         <div class="row g-3 align-items-center">
+            {% for field in form %}
+                <div class="col-auto">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ field.errors|join:", " }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
             <div class="col-auto">
-                {{ form.exchange.label_tag }} {{ form.exchange }}
-            </div>
-            <div class="col-auto">
-                {{ form.security.label_tag }} {{ form.security }}
-            </div>
-            <div class="col-auto">
-                {{ form.year.label_tag }} {{ form.year }}
-            </div>
-            <div class="col-auto">
-                {{ form.month.label_tag }} {{ form.month }}
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Search</button>
+                <button type="submit" class="btn btn-primary">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    Search
+                </button>
             </div>
         </div>
     </form>
 
-    {% if report %}
-        {% with side=side_name %}
-            {% include "fin_data_cl/financial_risks_accordion.html" %}
-        {% endwith %}
-    {% else %}
-        <div class="alert alert-warning mt-4" role="alert">
-            No financial risk report found for the selected criteria.
-        </div>
-    {% endif %}
+    <div id="{{ form_id }}-report-container">
+        {% if report %}
+            <p>Report Date: {{ report.date }}</p>
+            <p>New Risks: {{ report.new_risks }}</p>
+        {% else %}
+            <p class="text-muted">No sections available to display.</p>
+        {% endif %}
+        {% if report %}
+            {% with side=side_name %}
+                {% include "fin_data_cl/financial_risks_accordion.html" %}
+            {% endwith %}
+        {% else %}
+            <div class="alert alert-warning mt-4" role="alert">
+                No financial risk report found for the selected criteria.
+            </div>
+        {% endif %}
+    </div>
 </div>

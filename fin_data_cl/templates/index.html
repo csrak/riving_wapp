@@ -1,371 +1,530 @@
 {% extends "fin_data_cl/base.html" %}
-<script>
-console.log('Initial Price Data:', {{ initial_price_data|safe }});
-console.log('Initial Security:', {{ initial_security|safe }});
-</script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-{% block title %}Finriv - Advanced Financial Analysis Platform{% endblock %}
+{% load static %}
+
+{% block title %}Finriv - Smart Financial Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+        padding: 5rem 0;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: -4rem;
+    }
+
+    .hero-pattern {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.1) 1px, transparent 0);
+        background-size: 40px 40px;
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .market-summary {
+        position: relative;
+        z-index: 2;
+    }
+
+    .market-card {
+        transition: transform 0.2s;
+        border: none;
+        background: white;
+        height: 100%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .market-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    }
+
+    .card-header {
+        background: white;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        padding: 1rem 1.25rem;
+    }
+
+    .ticker-row {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .ticker-row:hover {
+        background-color: rgba(13, 110, 253, 0.04);
+    }
+
+    .ticker-row.table-active {
+        background-color: rgba(13, 110, 253, 0.08);
+    }
+
+    .chart-container {
+        min-height: 600px;
+        position: relative;
+        border-radius: 0.5rem;
+        background: white;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        border-radius: 0.5rem;
+    }
+
+    .date-badge {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        border: 1px solid rgba(13, 110, 253, 0.2);
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .timeframe-btn {
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        border-width: 1px;
+    }
+
+    .timeframe-btn.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+
+    .market-breadth-bar {
+        height: 2.5rem;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .market-breadth-bar .progress-bar {
+        transition: width 0.6s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .market-breadth-label {
+        white-space: nowrap;
+        padding: 0 1rem;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table th {
+        font-weight: 600;
+        color: #495057;
+        border-top: none;
+    }
+
+    .table td {
+        vertical-align: middle;
+        padding: 1rem 1.25rem;
+        border-color: rgba(0,0,0,0.05);
+    }
+
+    .table thead th {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding: 0.75rem 1.25rem;
+    }
+
+    .chart-card {
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        border-radius: 0.5rem;
+    }
+
+    .chart-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .summary-stats {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    .container {
+        max-width: 1400px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4">
-    <!-- Hero Section -->
-    <div class="row mb-5">
-        <div class="col-12 text-center py-5 bg-primary bg-gradient text-white rounded-3 shadow position-relative overflow-hidden">
-            <div class="position-absolute top-0 start-0 w-100 h-100" style="background: linear-gradient(45deg, rgba(0,123,255,0.7) 0%, rgba(0,123,255,0.3) 100%);"></div>
-            <div class="position-relative">
-                <h1 class="display-3 fw-bold mb-3">Welcome to Finriv</h1>
-                <p class="lead mb-4">Empower your investment decisions with advanced financial analysis tools</p>
-                <div class="d-flex justify-content-center gap-3">
-                    <a href="{% url 'stock_analysis' %}" class="btn btn-light btn-lg">Start Analysis</a>
-                    <a href="{% url 'screener' %}" class="btn btn-outline-light btn-lg">Screen Stocks</a>
+<!-- Hero Section -->
+<section class="hero-section text-white">
+    <div class="hero-pattern"></div>
+    <div class="hero-content">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <h1 class="display-4 fw-bold">Financial Analysis</h1>
+                    <div class="d-flex gap-3 mt-4">
+                        <a href="/screener/" class="btn btn-light btn-lg px-4">Explore Markets</a>
+                        <a href="{{ api_base_url }}price-data/" class="btn btn-outline-light btn-lg px-4">Analysis Tools</a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</section>
 
+<div class="container market-summary py-4">
     {% if error %}
     <div class="alert alert-warning" role="alert">
         {{ error }}
     </div>
     {% else %}
-    <!-- Market Overview Section -->
-    <div class="row mb-4">
+    <!-- Market Overview -->
+    <div class="row g-4 mb-4">
         <div class="col-12">
-            <h2 class="text-dark mb-3">Market Activity</h2>
-            <p class="text-muted">As of {{ latest_date|date:"F j, Y" }}</p>
-        </div>
-        <!-- Market Breadth -->
-        <div class="col-12 mb-4">
-            <div class="card shadow-sm">
+            <div class="card market-card">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">Market Breadth</h5>
-                    <div class="progress mb-3" style="height: 25px;">
-                        <div class="progress-bar bg-success" style="width: {{ market_breadth.gainers_percentage }}%" role="progressbar" aria-valuenow="{{ market_breadth.gainers_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ market_breadth.gainers }} Gainers
-                        </div>
-                        <div class="progress-bar bg-secondary" style="width: {{ market_breadth.unchanged_percentage }}%" role="progressbar" aria-valuenow="{{ market_breadth.unchanged_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ market_breadth.unchanged }}
-                        </div>
-                        <div class="progress-bar bg-danger" style="width: {{ market_breadth.losers_percentage }}%" role="progressbar" aria-valuenow="{{ market_breadth.losers_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ market_breadth.losers }} Decliners
-                        </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Market Pulse</h5>
+                        <span class="date-badge">
+                            <i class="bi bi-calendar3 me-2"></i>
+                            Last Trading Day: {{ formatted_date }}
+                        </span>
                     </div>
-                    <div class="text-center text-muted">
-                        Total Securities: {{ market_breadth.total }}
-                    </div>
-                </div>
-            </div>
-        </div>
-<div class="col-12 mb-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">
-                <span id="chart-security-name">{{ initial_security.symbol|default:'' }}</span>
-                <small class="text-muted" id="chart-security-price">{{ initial_security.price|default:'' }}</small>
-                <small class="{% if initial_security.is_positive == 'true' %}text-success{% else %}text-danger{% endif %}" id="chart-security-change">
-                    {{ initial_security.change|default:'' }}
-                </small>
-            </h5>
-            <div class="btn-group">
-                <!--<button class="btn btn-outline-primary btn-sm " data-period="1d">1D</button> there is no intraday-->
-                <button class="btn btn-outline-primary btn-sm active" data-period="1w">1W</button>
-                <button class="btn btn-outline-primary btn-sm" data-period="1m">1M</button>
-                <button class="btn btn-outline-primary btn-sm" data-period="1y">1Y</button>
-                <button class="btn btn-outline-primary btn-sm" data-period="5y">5Y</button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div id="price-chart" class="w-100" style="height: 400px;">
-                <!-- Loading indicator -->
-                <div class="d-flex justify-content-center align-items-center h-100">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                    <div class="market-breadth-bar progress">
+                        <div class="progress-bar bg-success"
+                             style="width: {{ market_breadth.gainers_percentage }}%">
+                            <span class="market-breadth-label">
+                                {{ market_breadth.gainers }} Advancing ({{ market_breadth.gainers_percentage|floatformat:1 }}%)
+                            </span>
+                        </div>
+                        <div class="progress-bar bg-secondary"
+                             style="width: {{ market_breadth.unchanged_percentage }}%">
+                            <span class="market-breadth-label">
+                                {{ market_breadth.unchanged }} Unchanged ({{ market_breadth.unchanged_percentage|floatformat:1 }}%)
+                            </span>
+                        </div>
+                        <div class="progress-bar bg-danger"
+                             style="width: {{ market_breadth.losers_percentage }}%">
+                            <span class="market-breadth-label">
+                                {{ market_breadth.losers }} Declining ({{ market_breadth.losers_percentage|floatformat:1 }}%)
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <!-- Market Movers -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card market-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Top Gainers</h5>
+                    <span class="badge bg-success-subtle text-success">Advancing</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-end">Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for gainer in top_gainers %}
+                                <tr class="ticker-row" data-ticker="{{ gainer.symbol }}">
+                                    <td class="fw-medium">{{ gainer.symbol }}</td>
+                                    <td class="text-end">{{ gainer.price }}</td>
+                                    <td class="text-end text-success fw-medium">{{ gainer.change }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card market-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Top Decliners</h5>
+                    <span class="badge bg-danger-subtle text-danger">Declining</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-end">Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loser in bottom_performers %}
+                                <tr class="ticker-row" data-ticker="{{ loser.symbol }}">
+                                    <td class="fw-medium">{{ loser.symbol }}</td>
+                                    <td class="text-end">{{ loser.price }}</td>
+                                    <td class="text-end text-danger fw-medium">{{ loser.change }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card chart-card">
+                <div class="chart-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 id="chart-title" class="mb-1">Market Overview</h5>
+                            <div id="chart-stats" class="summary-stats"></div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-primary timeframe-btn" data-timeframe="1W">1W</button>
+                            <button class="btn btn-outline-primary timeframe-btn" data-timeframe="1M">1M</button>
+                            <button class="btn btn-outline-primary timeframe-btn" data-timeframe="6M">6M</button>
+                            <button class="btn btn-outline-primary timeframe-btn active" data-timeframe="1Y">1Y</button>
+                            <button class="btn btn-outline-primary timeframe-btn" data-timeframe="5Y">5Y</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="chart-container">
+                        <div class="loading-overlay">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                        <div id="stock-plot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Tools -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <h2 class="fw-bold h4 mb-4">Analysis Tools</h2>
+        </div>
+        {% for tool in analysis_tools %}
+        <div class="col-md-6 col-lg-3">
+            <div class="card market-card">
+                <div class="card-body">
+                    <h5 class="card-title h6 fw-bold">{{ tool.name }}</h5>
+                    <p class="card-text text-muted small mb-4">{{ tool.description }}</p>
+                    <a href="{{ tool.url }}" class="btn btn-outline-primary w-100">Launch</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <script>
-$(document).ready(function() {
-    if (!$('#price-chart').length) {
-        console.error('Price chart element not found!');
+document.addEventListener('DOMContentLoaded', function() {
+    const API_BASE = '{{ api_base_url }}';
+    let currentTicker = null;
+    let currentTimeframe = '1Y';
+
+    function showLoading() {
+        document.querySelector('.loading-overlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+        document.querySelector('.loading-overlay').style.display = 'none';
+    }
+
+function updateChartTitle(ticker, data) {
+    const chartTitle = document.getElementById('chart-title');
+    const chartStats = document.getElementById('chart-stats');
+
+    if (!ticker) {
+        chartTitle.textContent = 'Market Overview';
+        chartStats.textContent = '';
         return;
     }
 
-    // Clear loading indicator
-    $('#price-chart').empty();
+    chartTitle.textContent = `${ticker} Price History`;
 
-    const initialPriceData = {{ initial_price_data|default:"[]"|safe }};
-    const initialSecurity = {{ initial_security|default:"{}"|safe }};
+    if (data && data.length > 0) {
+        const lastPrice = data[data.length - 1].close_price;
+        const firstPrice = data[0].close_price;
+        const priceDiff = lastPrice - firstPrice;
+        const percentChange = ((priceDiff / firstPrice) * 100).toFixed(2);
+        const sign = priceDiff >= 0 ? '+' : '';
 
-    // Set initial security ID on page load if we have one
-    if (initialSecurity && initialSecurity.security_id) {
-        $('#price-chart').data('security-id', initialSecurity.security_id);
-        createPriceChart(initialPriceData, '1w'); // Changed to 1w as default
+        // Get period text based on current timeframe
+        const timeframeText = {
+            '1W': 'Past Week',
+            '1M': 'Past Month',
+            '6M': 'Past 6 Months',
+            '1Y': 'Past Year',
+            '5Y': 'Past 5 Years',
+            'Max': 'All Time'
+        }[currentTimeframe] || '';
+
+        chartStats.innerHTML = `
+            <span class="me-3">Last: $${lastPrice.toFixed(2)}</span>
+            <span class="${priceDiff >= 0 ? 'text-success' : 'text-danger'}">
+                ${sign}${percentChange}% (${timeframeText})
+            </span>`;
     }
+}
 
-    // Update button click handler
-    $('.btn-group .btn').click(function(e) {
-        e.preventDefault();
-        const securityId = $('#price-chart').data('security-id');
-        if (!securityId && initialSecurity && initialSecurity.security_id) {
-            // Use initial security if no other is selected
-            $('#price-chart').data('security-id', initialSecurity.security_id);
-            securityId = initialSecurity.security_id;
-        }
+    function fetchAndRenderChart(ticker, timeframe) {
+        if (!ticker) return;
 
-        if (securityId) {
-            $('.btn-group .btn').removeClass('active');
-            $(this).addClass('active');
-            updateChart(securityId, $(this).data('period'));
-        }
-    });
+        showLoading();
+        const url = `${API_BASE}price-data/candlestick_data/?ticker=${ticker}&timeframe=${timeframe}`;
 
-    function createPriceChart(data, period) {
-        if (!data || data.length === 0) {
-            console.error('No data provided for chart');
-            $('#price-chart').html('<div class="alert alert-warning">No data available for this period</div>');
-            return;
-        }
-
-        try {
-            const trace = {
-                x: data.map(d => d.date),
-                open: data.map(d => d.open_price),
-                high: data.map(d => d.high_price),
-                low: data.map(d => d.low_price),
-                close: data.map(d => d.close_price),
-                decreasing: {line: {color: '#ef5350'}},
-                increasing: {line: {color: '#26a69a'}},
-                type: 'candlestick',
-                xaxis: 'x',
-                yaxis: 'y'
-            };
-
-            const volumeTrace = {
-                x: data.map(d => d.date),
-                y: data.map(d => d.volume),
-                type: 'bar',
-                name: 'Volume',
-                yaxis: 'y2',
-                marker: {
-                    color: data.map(d => d.close_price >= d.open_price ? '#26a69a33' : '#ef535033')
+        fetch(url)
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    throw new Error(result.error);
                 }
-            };
 
-            const layout = {
-                dragmode: 'zoom',
-                showlegend: false,
-                xaxis: {
-                    rangeslider: {visible: false},
-                    type: 'date'
-                },
-                yaxis: {title: 'Price'},
-                yaxis2: {
-                    title: 'Volume',
-                    overlaying: 'y',
-                    side: 'right',
-                    showgrid: false
-                },
-                margin: {t: 20, r: 50, l: 50, b: 20},
-                plot_bgcolor: '#ffffff',
-                paper_bgcolor: '#ffffff'
-            };
+                const data = result.data;
+                if (!data || !data.length) {
+                    throw new Error('No data available');
+                }
 
-            Plotly.newPlot('price-chart', [trace, volumeTrace], layout);
-        } catch (error) {
-            console.error('Error creating chart:', error);
-            $('#price-chart').html('<div class="alert alert-danger">Error creating chart</div>');
-        }
+                updateChartTitle(ticker, data);
+
+                const plotData = [{
+                    x: data.map(d => d.date),
+                    open: data.map(d => d.open_price),
+                    high: data.map(d => d.high_price),
+                    low: data.map(d => d.low_price),
+                    close: data.map(d => d.close_price),
+                    type: 'candlestick',
+                    increasing: {line: {color: '#26a69a'}, fillcolor: '#26a69a'},
+                    decreasing: {line: {color: '#ef5350'}, fillcolor: '#ef5350'},
+                    hoverinfo: 'x+y',
+                    hoverlabel: {
+                        bgcolor: '#1a237e',
+                        font: {color: 'white'}
+                    }
+                }];
+
+                const layout = {
+                    dragmode: 'zoom',
+                    showlegend: false,
+                    xaxis: {
+                        type: 'date',
+                        rangeslider: {visible: false},
+                        gridcolor: '#f5f5f5',
+                        showgrid: true,
+                        zeroline: false
+                    },
+                    yaxis: {
+                        autorange: true,
+                        title: 'Price ($)',
+                        tickformat: '$.2f',
+                        gridcolor: '#f5f5f5',
+                        showgrid: true,
+                        zeroline: false
+                    },
+                    plot_bgcolor: 'white',
+                    paper_bgcolor: 'white',
+                    margin: {t: 10, r: 40, b: 20, l: 60},
+                    hovermode: 'x unified'
+                };
+
+                Plotly.newPlot('stock-plot', plotData, layout, {
+                    responsive: true,
+                    scrollZoom: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: [
+                        'select2d',
+                        'lasso2d',
+                        'autoScale2d',
+                        'hoverClosestCartesian',
+                        'hoverCompareCartesian'
+                    ],
+                    displaylogo: false
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('stock-plot').innerHTML = `
+                    <div class="alert alert-warning m-4">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <div>
+                                <h6 class="alert-heading mb-1">Unable to Load Data</h6>
+                                <p class="mb-0">Error: ${error.message}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            })
+            .finally(hideLoading);
     }
 
-    // Initialize chart with initial data
-    createPriceChart(initialPriceData, '1d');
+    // Event Listeners
+    document.querySelectorAll('.ticker-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const ticker = this.dataset.ticker;
+            if (ticker) {
+                currentTicker = ticker;
+                fetchAndRenderChart(ticker, currentTimeframe);
 
-    // Handle security selection
-    function updateChart(securityId, period) {
-        console.log('Updating chart for security:', securityId, 'period:', period);
-        $.get('/get_security_prices/', {
-            security_id: securityId,
-            period: period
-        })
-        .done(function(response) {
-            console.log('Got response:', response);
-            createPriceChart(response.prices, response.period);
-        })
-        .fail(function(error) {
-            console.error('Error fetching price data:', error);
+                document.querySelectorAll('.ticker-row').forEach(r =>
+                    r.classList.toggle('table-active', r === this));
+            }
         });
+    });
+
+    document.querySelectorAll('.timeframe-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!currentTicker) return;
+
+            currentTimeframe = this.dataset.timeframe;
+            fetchAndRenderChart(currentTicker, currentTimeframe);
+
+            document.querySelectorAll('.timeframe-btn').forEach(b =>
+                b.classList.toggle('active', b === this));
+        });
+    });
+
+    // Load initial chart
+    const defaultTicker = document.querySelector('.ticker-row')?.dataset.ticker;
+    if (defaultTicker) {
+        currentTicker = defaultTicker;
+        fetchAndRenderChart(defaultTicker, currentTimeframe);
+        document.querySelector('.ticker-row').classList.add('table-active');
     }
-
-    // Event handlers for period buttons
-    $('.btn-group .btn').click(function(e) {
-        e.preventDefault();
-        $('.btn-group .btn').removeClass('active');
-        $(this).addClass('active');
-        const period = $(this).data('period');
-        const securityId = $('#price-chart').data('security-id');
-        if (securityId) {
-            updateChart(securityId, period);
-        }
-    });
-
-    // Event handlers for security selection
-    $('.list-group-item-action').click(function(e) {
-        e.preventDefault();
-        const securityId = $(this).data('security-id');
-        const period = $('.btn-group .btn.active').data('period');
-
-        // Update chart title and info
-        $('#chart-security-name').text($(this).data('symbol'));
-        $('#chart-security-price').text($(this).data('price'));
-        $('#chart-security-change').text($(this).data('change'))
-            .removeClass('text-success text-danger')
-            .addClass($(this).data('is-positive') ? 'text-success' : 'text-danger');
-
-        $('#price-chart').data('security-id', securityId);
-        updateChart(securityId, period);
-    });
 });
 </script>
-        <!-- Top Gainers -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">Top Gainers</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for stock in top_gainers %}
-<a href="#"
-   class="list-group-item list-group-item-action"
-   data-security-id="{{ stock.security_id }}"
-   data-symbol="{{ stock.symbol }}"
-   data-price="{{ stock.price }}"
-   data-change="{{ stock.change }}"
-   data-is-positive="{{ stock.is_positive|yesno:'true,false' }}">
-    <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ stock.symbol }}</strong>
-                                    <small class="text-muted ms-2">{{ stock.name }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="text-success">{{ stock.change }}</span>
-                                    <small class="text-muted d-block">{{ stock.volume }} vol</small>
-                                </div>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Top Losers -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">Top Decliners</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for stock in bottom_performers %}
-                        <a href="#"
-   class="list-group-item list-group-item-action"
-   data-security-id="{{ stock.security_id }}"
-   data-symbol="{{ stock.symbol }}"
-   data-price="{{ stock.price }}"
-   data-change="{{ stock.change }}"
-   data-is-positive="{{ stock.is_positive|yesno:'true,false' }}">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ stock.symbol }}</strong>
-                                    <small class="text-muted ms-2">{{ stock.name }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="text-danger">{{ stock.change }}</span>
-                                    <small class="text-muted d-block">{{ stock.volume }} vol</small>
-                                </div>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Features Section -->
-    <div class="row g-4 mb-5">
-        <div class="col-12">
-            <h2 class="text-dark mb-4">Platform Features</h2>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0 feature-card">
-                <div class="card-body">
-                    <div class="text-primary mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                    </div>
-                    <h5 class="card-title">Technical Analysis</h5>
-                    <p class="card-text">Advanced charting tools with candlestick patterns and technical indicators.</p>
-                    <a href="{% url 'stock_analysis' %}" class="stretched-link"></a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0 feature-card">
-                <div class="card-body">
-                    <div class="text-primary mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    </div>
-                    <h5 class="card-title">Stock Screener</h5>
-                    <p class="card-text">Filter and discover investment opportunities using comprehensive screening.</p>
-                    <a href="{% url 'screener' %}" class="stretched-link"></a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0 feature-card">
-                <div class="card-body">
-                    <div class="text-primary mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-                    </div>
-                    <h5 class="card-title">Financial Reports</h5>
-                    <p class="card-text">Compare and analyze detailed financial reports side by side.</p>
-                    <a href="{% url 'financial_reports' %}" class="stretched-link"></a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 shadow-sm border-0 feature-card">
-                <div class="card-body">
-                    <div class="text-primary mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    </div>
-                    <h5 class="card-title">Risk Analysis</h5>
-                    <p class="card-text">Evaluate and compare financial risks with comprehensive tools.</p>
-                    <a href="{% url 'financial_risks' %}" class="stretched-link"></a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<style>
-.feature-card {
-    transition: transform 0.2s ease-in-out;
-}
-
-.feature-card:hover {
-    transform: translateY(-5px);
-}
-
-.list-group-item-action:hover {
-    background-color: rgba(13, 110, 253, 0.04);
-}
-</style>
-
-
 {% endblock %}

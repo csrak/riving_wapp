@@ -1,0 +1,459 @@
+{% extends "fin_data_cl/base.html" %}
+{% load text_filters %}
+
+{% load static %}
+
+{% block title %}Financial Reports Comparison - Finriv{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-form {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .report-container {
+        height: 600px;
+        overflow-y: auto;
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .report-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .report-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .report-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .section-header {
+        background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+        color: white;
+        padding: 1rem;
+        margin: 0;
+        border-radius: 0.5rem 0.5rem 0 0;
+        font-weight: 500;
+    }
+
+    .section-content {
+        padding: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .form-select {
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 0.5rem;
+    }
+
+    .form-select:focus {
+        border-color: #1a237e;
+        box-shadow: 0 0 0 0.25rem rgba(26,35,126,0.25);
+    }
+
+    .btn-search {
+        background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .btn-search:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .loading-spinner {
+        display: none;
+        margin-right: 0.5rem;
+    }
+
+    .report-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="h3 mb-4">Financial Reports Comparison</h1>
+
+    <div class="row g-4">
+        <!-- Exchange Selection -->
+        <div class="col-12">
+            <div class="report-form p-4 mb-4">
+                <select id="exchange-select" class="form-select">
+                    <option value="">Select an exchange...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Left Form -->
+        <div class="col-md-6">
+            <div class="report-form p-4">
+                <h5 class="mb-3">Report 1</h5>
+                <div class="mb-3">
+                    <label class="form-label">Security</label>
+                    <select class="form-select security-select" data-side="left">
+                        <option value="">Select a security...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Year</label>
+                    <select class="form-select year-select" data-side="left">
+                        <option value="">Select year...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Month</label>
+                    <select class="form-select month-select" data-side="left">
+                        <option value="">Select month...</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-search w-100" data-side="left">
+                    <span class="spinner-border spinner-border-sm loading-spinner"></span>
+                    <span class="btn-text">Load Report</span>
+                </button>
+            </div>
+
+            <div class="report-container mt-4" id="left-report">
+                <div class="report-placeholder">
+                    <p class="mb-0">Select parameters and search to view the report</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Form -->
+        <div class="col-md-6">
+            <div class="report-form p-4">
+                <h5 class="mb-3">Report 2</h5>
+                <div class="mb-3">
+                    <label class="form-label">Security</label>
+                    <select class="form-select security-select" data-side="right">
+                        <option value="">Select a security...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Year</label>
+                    <select class="form-select year-select" data-side="right">
+                        <option value="">Select year...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Month</label>
+                    <select class="form-select month-select" data-side="right">
+                        <option value="">Select month...</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-search w-100" data-side="right">
+                    <span class="spinner-border spinner-border-sm loading-spinner"></span>
+                    <span class="btn-text">Load Report</span>
+                </button>
+            </div>
+
+            <div class="report-container mt-4" id="right-report">
+                <div class="report-placeholder">
+                    <p class="mb-0">Select parameters and search to view the report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const API_BASE = '{{ api_base_url }}';
+    const FINANCIAL_REPORTS_API = `${API_BASE}financial-reports/`;
+
+    // Cache DOM elements
+    const exchangeSelect = document.getElementById('exchange-select');
+    const securitySelects = document.querySelectorAll('.security-select');
+    const yearSelects = document.querySelectorAll('.year-select');
+    const monthSelects = document.querySelectorAll('.month-select');
+    const searchButtons = document.querySelectorAll('.btn-search');
+
+    // Initialize exchanges
+    fetch(`${FINANCIAL_REPORTS_API}available_exchanges/`)
+        .then(response => response.json())
+        .then(data => {
+            data.exchanges.forEach(exchange => {
+                exchangeSelect.add(new Option(exchange.name, exchange.id));
+            });
+        })
+        .catch(error => {
+            console.error('Error loading exchanges:', error);
+            exchangeSelect.innerHTML = '<option value="">Error loading exchanges</option>';
+        });
+
+    // Exchange change handler
+    exchangeSelect.addEventListener('change', function() {
+        const exchangeId = this.value;
+
+        securitySelects.forEach(select => {
+            select.innerHTML = '<option value="">Select a security...</option>';
+            select.disabled = true;
+        });
+
+        if (!exchangeId) return;
+
+        fetch(`${API_BASE}reports/exchanges/${exchangeId}/securities/`)
+            .then(response => response.json())
+            .then(data => {
+                securitySelects.forEach(select => {
+                    data.securities.forEach(security => {
+                        select.add(new Option(security.name, security.id));
+                    });
+                    select.disabled = false;
+                });
+            })
+            .catch(error => {
+                console.error('Error loading securities:', error);
+                securitySelects.forEach(select => {
+                    select.innerHTML = '<option value="">Error loading securities</option>';
+                });
+            });
+    });
+
+    // Security change handler
+    securitySelects.forEach(select => {
+        select.addEventListener('change', function() {
+            const securityId = this.value;
+            const side = this.dataset.side;
+
+            const yearSelect = document.querySelector(`.year-select[data-side="${side}"]`);
+            const monthSelect = document.querySelector(`.month-select[data-side="${side}"]`);
+
+            yearSelect.innerHTML = '<option value="">Select year...</option>';
+            monthSelect.innerHTML = '<option value="">Select month...</option>';
+            yearSelect.disabled = true;
+            monthSelect.disabled = true;
+
+            if (!securityId) return;
+
+            fetch(`${FINANCIAL_REPORTS_API}available_dates/?security_id=${securityId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.years?.length) {
+                        yearSelect.innerHTML = '<option value="">No years available</option>';
+                        return;
+                    }
+
+                    data.years.forEach(year => {
+                        yearSelect.add(new Option(year, year));
+                    });
+                    yearSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error loading years:', error);
+                    yearSelect.innerHTML = '<option value="">Error loading years</option>';
+                });
+        });
+    });
+
+    // Year change handler
+    yearSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            const year = this.value;
+            const side = this.dataset.side;
+            const securityId = document.querySelector(`.security-select[data-side="${side}"]`).value;
+
+            const monthSelect = document.querySelector(`.month-select[data-side="${side}"]`);
+            monthSelect.innerHTML = '<option value="">Select month...</option>';
+            monthSelect.disabled = true;
+
+            if (!year || !securityId) return;
+
+            fetch(`${FINANCIAL_REPORTS_API}available_dates/?security_id=${securityId}&year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.months?.length) {
+                        monthSelect.innerHTML = '<option value="">No months available</option>';
+                        return;
+                    }
+
+                    data.months.forEach(month => {
+                        monthSelect.add(new Option(month.name, month.number));
+                    });
+                    monthSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error loading months:', error);
+                    monthSelect.innerHTML = '<option value="">Error loading months</option>';
+                });
+        });
+    });
+    function formatJsonContent(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    try {
+        // If it's already an object, stringify it with formatting
+        return JSON.stringify(content, null, 2)
+            .replace(/\n/g, '<br>')
+            .replace(/\s{2}/g, '&nbsp;&nbsp;');
+    } catch (e) {
+        return String(content);
+    }
+}
+
+function createReportSection(title, content) {
+    return `
+        <div class="report-section mb-4">
+            <h4 class="section-header">${title}</h4>
+            <div class="section-content">
+                ${content}
+            </div>
+        </div>
+    `;
+}
+searchButtons.forEach(button => {
+    button.addEventListener('click', async function() {
+        const side = this.dataset.side;
+        const securityId = document.querySelector(`.security-select[data-side="${side}"]`).value;
+        const year = document.querySelector(`.year-select[data-side="${side}"]`).value;
+        const month = document.querySelector(`.month-select[data-side="${side}"]`).value;
+
+        if (!securityId || !year || !month) {
+            alert('Please select all required fields');
+            return;
+        }
+
+        const loadingSpinner = this.querySelector('.loading-spinner');
+        const btnText = this.querySelector('.btn-text');
+        const reportContainer = document.getElementById(`${side}-report`);
+
+        loadingSpinner.style.display = 'inline-block';
+        btnText.textContent = 'Loading...';
+        this.disabled = true;
+
+        try {
+            const url = `${FINANCIAL_REPORTS_API}?security=${securityId}&year=${year}&month=${month}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!data.results || !data.results.length) {
+                throw new Error('No report found for the selected period');
+            }
+
+            const report = data.results[0];
+            let reportHtml = '';
+
+            // Business Overview - already text, just needs the filter
+            if (report.business_overview) {
+                const businessOverviewHtml = marked.parse(report.business_overview);
+
+                reportHtml += `
+                    <div class="report-section mb-4">
+                        <h4 class="section-header">Business Overview</h4>
+                        <div class="section-content">
+                            ${businessOverviewHtml}
+                        </div>
+                    </div>`;
+            }
+
+
+            // Risks - array of objects that need formatting
+            if (report.risks && Array.isArray(report.risks)) {
+                reportHtml += `
+                    <div class="report-section mb-4">
+                        <h4 class="section-header">Risks Analysis</h4>
+                        <div class="section-content">
+                            ${report.risks.map(risk => `
+                                <div class="risk-item mb-3">
+                                    <h5 class="risk-title">${risk.title || ''}</h5>
+                                    <p class="risk-description">${risk.description || ''}</p>
+                                    ${risk.impact ? `<p class="risk-impact"><strong>Impact:</strong> ${risk.impact}</p>` : ''}
+                                    ${risk.mitigation ? `<p class="risk-mitigation"><strong>Mitigation:</strong> ${risk.mitigation}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+            }
+
+            // Metrics - object with metric data
+            if (report.metrics) {
+                reportHtml += `
+                    <div class="report-section mb-4">
+                        <h4 class="section-header">Key Metrics</h4>
+                        <div class="section-content">
+                            ${Object.entries(report.metrics).map(([key, value]) => `
+                                <div class="metric-item mb-2">
+                                    <strong>${key}:</strong> ${value}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+            }
+
+            // Historical Changes - array of changes
+            if (report.historical_changes && Array.isArray(report.historical_changes)) {
+                reportHtml += `
+                    <div class="report-section mb-4">
+                        <h4 class="section-header">Historical Changes</h4>
+                        <div class="section-content">
+                            ${report.historical_changes.map(change => `
+                                <div class="change-item mb-3">
+                                    <h5 class="change-title">${change.title || ''}</h5>
+                                    <p class="change-description">${change.description || ''}</p>
+                                    ${change.date ? `<p class="change-date"><strong>Date:</strong> ${change.date}</p>` : ''}
+                                    ${change.impact ? `<p class="change-impact"><strong>Impact:</strong> ${change.impact}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+            }
+
+            // Future Outlook - array of outlook items
+            if (report.future_outlook && Array.isArray(report.future_outlook)) {
+                reportHtml += `
+                    <div class="report-section mb-4">
+                        <h4 class="section-header">Future Outlook</h4>
+                        <div class="section-content">
+                            ${report.future_outlook.map(outlook => `
+                                <div class="outlook-item mb-3">
+                                    <h5 class="outlook-title">${outlook.title || ''}</h5>
+                                    <p class="outlook-description">${outlook.description || ''}</p>
+                                    ${outlook.timeline ? `<p class="outlook-timeline"><strong>Timeline:</strong> ${outlook.timeline}</p>` : ''}
+                                    ${outlook.potential_impact ? `<p class="outlook-impact"><strong>Potential Impact:</strong> ${outlook.potential_impact}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+            }
+
+            reportContainer.innerHTML = reportHtml;
+
+        } catch (error) {
+            console.error('Complete error details:', error);
+            reportContainer.innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <h6 class="alert-heading mb-1">Error Loading Report</h6>
+                    <p class="mb-0">${error.message}</p>
+                </div>`;
+        } finally {
+            loadingSpinner.style.display = 'none';
+            btnText.textContent = 'Load Report';
+            this.disabled = false;
+        }
+    });
+});
+});
+</script>
+{% endblock %}

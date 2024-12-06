@@ -1,16 +1,9 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import (
-    StockAnalysisView,
-    SecurityViewSet,
-    StockAnalysisViewSet
-)
+#plot_app/urls.py
+from django.urls import path
+from . import views
 
-router = DefaultRouter()
-router.register(r'stock-securities', SecurityViewSet, basename='stock-security')
-router.register(r'stock-analysis', StockAnalysisViewSet, basename='stock-analysis')
+app_name = 'plots'
 
 urlpatterns = [
-    path('price_plot/', StockAnalysisView.as_view(), name='stock_analysis'),
-    path('api/', include(router.urls)),
+    path('analysis/', views.StockAnalysisView.as_view(), name='stock_analysis'),
 ]

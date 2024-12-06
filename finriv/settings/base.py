@@ -21,6 +21,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_extensions',
     'management_commands',
+    'rest_framework',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -76,34 +78,7 @@ STATICFILES_DIRS = [
 ]# Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Logging Configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'level': 'WARNING',
-            'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'level': 'WARNING',
-            'class': 'logging.FileHandler',
-            'filename': 'debug.log',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
-            'level': 'WARNING',
-            'propagate': True,
-        },
-        'fin_data_cl': {
-            'handlers': ['console', 'file'],
-            'level': 'WARNING',
-            'propagate': True,
-        },
-    },
-}
+
 Q_CLUSTER = {
     'name': 'DjangoQ',
     'workers': 4,
@@ -121,3 +96,10 @@ MAX_CONSECUTIVE_ERRORS = int(os.getenv('MAX_CONSECUTIVE_ERRORS', 5))  # max erro
 # Logging configuration for scheduler
 
 ANALYSIS_CACHE_TIMEOUT = 60 * 15  # 15 minutes
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+}
+API_BASE_URL = '/api/v1/' #To save time writign api calls

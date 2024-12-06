@@ -1,199 +1,228 @@
+<-- This is the main template for the financial risks comparison page. -->
 {% extends "fin_data_cl/base.html" %}
+{% load static %}
 {% load text_filters %}
 
 {% block title %}Risk Comparisons{% endblock %}
+
 {% block content %}
 <div class="row" data-comparison-type="risks">
     <div class="col-md-6 px-4">
-        {% with form_id="left" number=1 side_name="Left" form=form_left report=report_left %}
-            {% include "fin_data_cl/financial_risks_section.html" %}
-        {% endwith %}
+        <div class="form-section">
+            {% with form_id="left" number=1 side_name="Left" form=form_left report=report_left %}
+                {% include "fin_data_cl/financial_risks_section.html" %}
+            {% endwith %}
+            <div class="error-message" id="left-error"></div>
+        </div>
     </div>
 
     <div class="col-md-6 px-4">
-        {% with form_id="right" number=2 side_name="Right" form=form_right report=report_right %}
-            {% include "fin_data_cl/financial_risks_section.html" %}
-        {% endwith %}
+        <div class="form-section">
+            {% with form_id="right" number=2 side_name="Right" form=form_right report=report_right %}
+                {% include "fin_data_cl/financial_risks_section.html" %}
+            {% endwith %}
+            <div class="error-message" id="right-error"></div>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Helper function to show loading state in select elements
-    function setLoadingState(selectElement) {
-        selectElement.disabled = true;
-        selectElement.innerHTML = '<option value="">Loading...</option>';
+    const BASE_URL = "/api/financial/risks/";
+
+    function showError(formId, message) {
+        const errorDiv = document.getElementById(`${formId}-error`);
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.classList.add("alert", "alert-danger");
+            setTimeout(() => {
+                errorDiv.classList.remove("alert", "alert-danger");
+                errorDiv.textContent = "";
+            }, 8000);
+        }
+        console.error(`Form ${formId} error:`, message);
     }
 
-    // Helper function to handle fetch errors
-    function handleFetchError(selectElement, error) {
-        console.error("Fetch error:", error);
-        selectElement.disabled = false;
-        selectElement.innerHTML = '<option value="">Error loading options</option>';
+    async function fetchData(url) {
+        try {
+            console.log(`Fetching data from: ${url}`);
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Fetch error:", error);
+            throw error;
+        }
     }
-function getUrlPrefix() {
-    const row = document.querySelector('.row');
-    const comparisonType = row.dataset.comparisonType;
-    console.log('Comparison type:', comparisonType);
-    const prefix = comparisonType === 'risks' ? '/risks' : '';
-    console.log('URL prefix:', prefix);
-    return prefix;
-}
-function updateSecurities(exchangeId, securitySelect) {
-    if (!exchangeId || !securitySelect) return;
 
-    setLoadingState(securitySelect);
-    const urlPrefix = getUrlPrefix();
-
-    fetch(`${urlPrefix}/securities/${exchangeId}/`)
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            // Rest of the code remains the same
-        })
-        .catch(error => handleFetchError(securitySelect, error));
-}
-
-function updateYears(securityId, yearSelect) {
-    if (!securityId || !yearSelect) return;
-
-    setLoadingState(yearSelect);
-    const urlPrefix = getUrlPrefix();
-    const url = `${urlPrefix}/dates/${securityId}/`;
-
-    console.log('Fetching years from URL:', url);
-
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                console.error('Response not OK:', response.status, response.statusText);
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received years data:', data);
-            yearSelect.disabled = false;
-            yearSelect.innerHTML = '<option value="">Select a Year</option>';
-            if (data.years && Array.isArray(data.years)) {
-                data.years.forEach(year => {
-                    const option = document.createElement("option");
-                    option.value = year;
-                    option.textContent = year;
-                    yearSelect.appendChild(option);
-                });
-            } else {
-                console.error('Unexpected data format:', data);
-                yearSelect.innerHTML = '<option value="">No years available</option>';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching years:', error);
-            handleFetchError(yearSelect, error);
+    function updateSelect(select, options, defaultText = "Select an option") {
+        select.innerHTML = `<option value="">${defaultText}</option>`;
+        options.forEach((option) => {
+            const optionElement = document.createElement("option");
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            select.appendChild(optionElement);
         });
-}
+        select.disabled = options.length === 0;
+    }
 
-function updateMonths(securityId, year, monthSelect) {
-    if (!securityId || !year || !monthSelect) return;
-
-    setLoadingState(monthSelect);
-    const urlPrefix = getUrlPrefix();
-    const url = `${urlPrefix}/months/${securityId}/${year}/`;
-
-    console.log('Fetching months from URL:', url);
-
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                console.error('Response not OK:', response.status, response.statusText);
-                throw new Error('Network response was not ok');
+    class ComparisonForm {
+        constructor(formId) {
+            this.formId = formId;
+            this.form = document.querySelector(`form[data-form-id="${formId}"]`);
+            if (!this.form) {
+                console.error(`Form with data-form-id="${formId}" not found`);
+                return;
             }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received months data:', data);
-            monthSelect.disabled = false;
-            monthSelect.innerHTML = '<option value="">Select a Month</option>';
-            if (data.months && Array.isArray(data.months)) {
-                data.months.forEach(month => {
-                    const option = document.createElement("option");
-                    option.value = month;
-                    // Format month number to display name (e.g., 1 -> "January")
-                    const monthName = new Date(2000, month - 1, 1).toLocaleString('default', { month: 'long' });
-                    option.textContent = `${monthName} (${month})`;
-                    monthSelect.appendChild(option);
-                });
-            } else {
-                console.error('Unexpected data format:', data);
-                monthSelect.innerHTML = '<option value="">No months available</option>';
+            this.selects = {
+                exchange: this.form.querySelector(`select[name="${formId}-exchange"]`),
+                security: this.form.querySelector(`select[name="${formId}-security"]`),
+                year: this.form.querySelector(`select[name="${formId}-year"]`),
+                month: this.form.querySelector(`select[name="${formId}-month"]`)
+            };
+            this.submitButton = this.form.querySelector('button[type="submit"]');
+            this.spinner = this.submitButton?.querySelector('.spinner-border');
+            this.initializeEventListeners();
+        }
+
+        async handleExchangeChange(e) {
+            const exchangeId = e.target.value;
+            if (!exchangeId) {
+                updateSelect(this.selects.security, [], "Select a Security");
+                updateSelect(this.selects.year, [], "Select a Security First");
+                updateSelect(this.selects.month, [], "Select a Year First");
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error fetching months:', error);
-            handleFetchError(monthSelect, error);
+
+            try {
+                const url = `${BASE_URL}exchanges/${exchangeId}/securities/?type=risk`;
+                const data = await fetchData(url);
+                console.log('Available securities:', data.securities);
+
+                updateSelect(
+                    this.selects.security,
+                    data.securities.map((s) => ({ value: s.id, label: s.name })),
+                    "Select a Security"
+                );
+
+                updateSelect(this.selects.year, [], "Select a Security First");
+                updateSelect(this.selects.month, [], "Select a Year First");
+            } catch (error) {
+                console.error('Securities fetch error:', error);
+                showError(this.formId, "Failed to load securities");
+            }
+        }
+
+        async handleSecurityChange(e) {
+            const securityId = e.target.value;
+            if (!securityId) {
+                updateSelect(this.selects.year, [], "Select a Security First");
+                updateSelect(this.selects.month, [], "Select a Year First");
+                return;
+            }
+
+            try {
+                const url = `${BASE_URL}securities/${securityId}/years/?type=risk`;
+                const data = await fetchData(url);
+                console.log('Available years:', data.years);
+
+                updateSelect(
+                    this.selects.year,
+                    data.years.map(year => ({ value: year, label: year.toString() })),
+                    "Select a Year"
+                );
+
+                updateSelect(this.selects.month, [], "Select a Year First");
+            } catch (error) {
+                console.error('Year fetch error:', error);
+                showError(this.formId, "Failed to load years");
+            }
+        }
+
+        async handleYearChange(e) {
+            const year = e.target.value;
+            const securityId = this.selects.security.value;
+            if (!year || !securityId) {
+                updateSelect(this.selects.month, [], "Select a Year First");
+                return;
+            }
+
+            try {
+                const url = `${BASE_URL}securities/${securityId}/years/${year}/months/?type=risk`;
+                const data = await fetchData(url);
+                console.log('Available months:', data.months);
+
+                updateSelect(
+                    this.selects.month,
+                    data.months.map(month => ({
+                        value: month,
+                        label: new Date(2000, month - 1).toLocaleString("default", { month: "long" })
+                    })),
+                    "Select a Month"
+                );
+            } catch (error) {
+                console.error('Month fetch error:', error);
+                showError(this.formId, "Failed to load months");
+            }
+        }
+
+    async handleFormSubmit(e) {
+        e.preventDefault();
+
+        const formData = new FormData();
+        const fields = {
+            exchange: this.selects.exchange.value,
+            security: this.selects.security.value,
+            year: this.selects.year.value,
+            month: this.selects.month.value
+        };
+
+        // Log values being sent
+        console.log('Values to submit:', fields);
+        console.log('Current security select state:', {
+            value: this.selects.security.value,
+            options: Array.from(this.selects.security.options).map(o => ({
+                value: o.value,
+                text: o.text,
+                selected: o.selected
+            }))
         });
-}
 
-    // Set up event listeners for both forms
-    ['left', 'right'].forEach(prefix => {
-        console.log(`Setting up handlers for ${prefix} form`);
-
-        // Get form elements directly by their names
-        const exchangeSelect = document.querySelector(`select[name="${prefix}-exchange"]`);
-        const securitySelect = document.querySelector(`select[name="${prefix}-security"]`);
-        const yearSelect = document.querySelector(`select[name="${prefix}-year"]`);
-        const monthSelect = document.querySelector(`select[name="${prefix}-month"]`);
-
-        if (!exchangeSelect) {
-            console.error(`Could not find exchange select for ${prefix} form`);
+        // Validate fields exist in options
+        const securityExists = Array.from(this.selects.security.options).some(o => o.value === fields.security);
+        if (!securityExists) {
+            showError(this.formId, "Selected security is not in available options");
             return;
         }
 
-        // Exchange change handler
-        exchangeSelect.addEventListener("change", function() {
-            const exchangeId = this.value;
-            if (!exchangeId) return;
+        formData.append('form_id', this.formId);
+        formData.append('csrfmiddlewaretoken', document.querySelector("[name=csrfmiddlewaretoken]").value);
 
-            console.log(`Exchange changed in ${prefix} form to: ${exchangeId}`);
-
-            // Reset and update dependent dropdowns
-            if (securitySelect) {
-                securitySelect.innerHTML = '<option value="">Select a Security</option>';
-                yearSelect.innerHTML = '<option value="">Select a Security First</option>';
-                monthSelect.innerHTML = '<option value="">Select a Year First</option>';
-                updateSecurities(exchangeId, securitySelect);
-            }
+        // Ensure we're using prefixed field names
+        Object.entries(fields).forEach(([key, value]) => {
+            const fieldName = `${this.formId}-${key}`;
+            formData.append(fieldName, value);
+            console.log(`Appending field: ${fieldName} = ${value}`);
         });
 
-        // Security change handler
-        if (securitySelect) {
-            securitySelect.addEventListener("change", function() {
-                const securityId = this.value;
-                if (!securityId) return;
+        initializeEventListeners() {
+            if (!this.form) return;
 
-                console.log(`Security changed in ${prefix} form to: ${securityId}`);
-
-                yearSelect.innerHTML = '<option value="">Select a Year</option>';
-                monthSelect.innerHTML = '<option value="">Select a Year First</option>';
-                updateYears(securityId, yearSelect);
-            });
+            this.selects.exchange?.addEventListener("change", this.handleExchangeChange.bind(this));
+            this.selects.security?.addEventListener("change", this.handleSecurityChange.bind(this));
+            this.selects.year?.addEventListener("change", this.handleYearChange.bind(this));
+            this.selects.month?.addEventListener("change", () => {});
+            this.form.addEventListener("submit", this.handleFormSubmit.bind(this));
         }
+    }
 
-        // Year change handler
-        if (yearSelect) {
-            yearSelect.addEventListener("change", function() {
-                const securityId = securitySelect.value;
-                const year = this.value;
-                if (!securityId || !year) return;
-
-                console.log(`Year changed in ${prefix} form to: ${year}`);
-
-                monthSelect.innerHTML = '<option value="">Select a Month</option>';
-                updateMonths(securityId, year, monthSelect);
-            });
-        }
-    });
+    ["left", "right"].forEach(formId => new ComparisonForm(formId));
 });
 </script>
+
+
 {% endblock %}

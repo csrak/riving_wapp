@@ -1,0 +1,46 @@
+
+/* Form Elements */
+select.error {
+    border-color: #dc3545;
+    background-color: #fff8f8;
+}
+
+select:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+/* Form Section */
+.form-section {
+    position: relative;
+}
+
+/* Error Messages */
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: none;
+}
+
+.error-message.active {
+    display: block;
+}

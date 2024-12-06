@@ -1,9 +1,12 @@
+# fin_data_cl/utils/fin_data_ops.py
 from django.db.models import Model
 from typing import Optional, TypeVar, Generic, List
 from fin_data_cl.models import Security, FinancialReport, RiskComparison
+import logging
 
 T = TypeVar('T', bound=Model)
 
+logger = logging.getLogger(__name__)
 
 class FinancialRepository(Generic[T]):
     """Handles database operations for financial models."""
@@ -11,15 +14,24 @@ class FinancialRepository(Generic[T]):
     def __init__(self, model: type[T]):
         self.model = model
 
+    # Repository Class
+
     def get_by_criteria(self, security_id: int, year: int, month: int) -> Optional[T]:
-        """Fetch financial data based on search criteria."""
         try:
-            return self.model.objects.get(
+            logger.debug(f"Fetching data for security_id={security_id}, year={year}, month={month}")
+            queryset = self.model.objects.filter(
                 security_id=security_id,
                 date__year=year,
                 date__month=month
             )
-        except self.model.DoesNotExist:
+            logger.debug(f"Constructed Query: {queryset.query}")
+            result = queryset.first()
+            logger.debug(f"Query Result: {result}")
+            logger.debug(f"Query parameters: security_id={security_id}, year={year}, month={month}")
+            logger.debug(f"Found records: {queryset.count()}")
+            return result
+        except Exception as e:
+            logger.error(f"Error fetching data: {str(e)}", exc_info=True)
             return None
 
     def get_years_for_security(self, security_id: int) -> List[int]:
