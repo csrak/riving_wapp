@@ -33,45 +33,50 @@ class PriceDataFetcher:
         except (InvalidOperation, ValueError):
             return None
 
-    def fetch_data(self, security: Security) -> List[Dict]:
+    def fetch_data(self, security: Security, use_previous_day: bool = False) -> List[Dict]:
         """
         Fetch price data for a single security starting from the appropriate date
+        Args:
+            security: Security object to fetch data for
+            use_previous_day: If True, fetch data up to previous trading day instead of today
         """
         price_data_list = []
         full_symbol = f"{security.ticker}.{self.exchange.suffix}"
 
         try:
-            # Determine the start date
             start_date = PriceData.get_start_date(security)
             today = timezone.now().date()
 
-            if start_date >= today:
+            if use_previous_day:
+                end_date = today - timedelta(days=1)
+            else:
+                end_date = today
+
+            if start_date >= end_date:
                 logger.info(f"Data already up to date for {full_symbol}")
                 return []
 
             logger.info(
-                f"Fetching {full_symbol} data from {start_date} to {today}"
+                f"Fetching {full_symbol} data from {start_date} to {end_date}"
             )
 
-            # Fetch data from Yahoo Finance
             stock = yf.Ticker(full_symbol)
             hist = stock.history(
                 start=start_date,
-                end=today + timedelta(days=1)  # Include today
+                end=end_date + timedelta(days=1)  # Include end_date
             )
 
+            # Rest of the method remains unchanged
             if hist.empty:
                 logger.warning(f"No new data returned for {full_symbol}")
                 return []
 
-            # Try to get market cap once
             try:
                 market_cap = self.to_decimal(stock.info.get('marketCap'))
             except Exception:
                 market_cap = None
                 logger.warning(f"Failed to fetch market cap for {full_symbol}")
 
-            # Process each day's data
             current_time = timezone.now()
             for date, row in hist.iterrows():
                 price_data = {
@@ -108,7 +113,7 @@ class PriceUpdateManager:
         self.total_records_updated = 0
         self.last_update_stats = {}
 
-    def execute_update(self) -> bool:
+    def execute_update(self, use_previous_day: bool = False) -> bool:
         """
         Executes the price update process with enhanced monitoring
         Returns: True if update was successful
@@ -135,7 +140,7 @@ class PriceUpdateManager:
                 for security in pbar:
                     try:
                         with transaction.atomic():
-                            price_data_list = self.fetcher.fetch_data(security)
+                            price_data_list = self.fetcher.fetch_data(security, use_previous_day)
 
                             if price_data_list:
                                 PriceData.objects.bulk_create(

@@ -27,7 +27,7 @@ VIEWSET_MAPPING = {
     },
     'risk-comparisons': {
         'viewset': viewsets.RiskComparisonViewSet,
-        'templates': ['risk_analysis']
+        'templates': ['risks','risk_analysis']
     },
     'dividends': {
         'viewset': viewsets.DividendDataViewSet,

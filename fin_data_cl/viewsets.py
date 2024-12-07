@@ -47,7 +47,7 @@ class BaseFinancialViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = self.model.objects.select_related(
             'security',
             'security__exchange'
-        )
+        ).order_by('-date')
 
         # Handle nested routes (e.g., /securities/{id}/financial-data/)
         security_pk = self.kwargs.get('security_pk')
@@ -115,6 +115,34 @@ class BaseFinancialViewSet(viewsets.ReadOnlyModelViewSet):
             print(f"Error in available_exchanges: {str(e)}")
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=False)
+    def securities_by_exchange(self, request):
+        """Get securities with data for an exchange."""
+        exchange_id = request.query_params.get('exchange_id')
+        if not exchange_id:
+            return Response({"error": "exchange_id is required"}, status=400)
+
+        try:
+            # Get the correct related name by adding _data suffix
+            model_name = f"{self.model._meta.model_name}_data"
+
+            securities = Security.objects.filter(
+                exchange_id=exchange_id,
+                **{f"{model_name}__isnull": False}
+            ).distinct().order_by('ticker')
+
+            return Response({
+                'securities': [
+                    {
+                        'id': security.id,
+                        'ticker': security.ticker,
+                        'name': security.name
+                    }
+                    for security in securities
+                ]
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
     @action(detail=False)
     def date_range(self, request):
         """
@@ -376,19 +404,35 @@ class FinancialDataViewSet(BaseFinancialViewSet):
     model = FinancialData
     serializer_class = FinancialDataSerializer
     supports_latest = True
-    queryset = FinancialData.objects.all()
+    queryset = FinancialData.objects.all().order_by('-date')
 
 
 class FinancialReportViewSet(BaseFinancialViewSet):
     """ViewSet for financial reports."""
     model = FinancialReport
     serializer_class = FinancialReportSerializer
-    queryset = FinancialReport.objects.all()
+    queryset = FinancialReport.objects.all().order_by('-date')
 
 
 class RiskComparisonViewSet(BaseFinancialViewSet):
     """ViewSet for risk comparisons."""
     model = RiskComparison
     serializer_class = RiskComparisonSerializer
-    queryset = RiskComparison.objects.all()
+    queryset = RiskComparison.objects.all().order_by('-date')
 
+    # def get_queryset(self):
+    #     queryset = super().get_queryset()
+    #
+    #     # Debug print the actual results
+    #     results = list(queryset)
+    #     print(f"Found {len(results)} results")
+    #     if results:
+    #         print("First result data:", {
+    #             'id': results[0].id,
+    #             'date': results[0].date,
+    #             'new_risks': results[0].new_risks,
+    #             'modified_risks': results[0].modified_risks,
+    #             'old_risks': results[0].old_risks
+    #         })
+    #
+    #     return queryset

@@ -1,0 +1,429 @@
+{% extends "fin_data_cl/base.html" %}
+{% load text_filters %}
+{% load static %}
+
+{% block title %}Risk Report Comparison - Finriv{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-form {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .report-container {
+        height: 600px;
+        overflow-y: auto;
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .report-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .report-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .report-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .section-header {
+        background: linear-gradient(135deg, #b71c1c 0%, #c62828 100%);
+        color: white;
+        padding: 1rem;
+        margin: 0;
+        border-radius: 0.5rem 0.5rem 0 0;
+        font-weight: 500;
+    }
+
+    .section-content {
+        padding: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .form-select {
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 0.5rem;
+    }
+
+    .form-select:focus {
+        border-color: #b71c1c;
+        box-shadow: 0 0 0 0.25rem rgba(183,28,28,0.25);
+    }
+
+    .btn-search {
+        background: linear-gradient(135deg, #b71c1c 0%, #c62828 100%);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .btn-search:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .loading-spinner {
+        display: none;
+        margin-right: 0.5rem;
+    }
+
+    .report-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6c757d;
+    }
+
+    .risk-item {
+        border-left: 4px solid;
+        padding-left: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .new-risk {
+        border-color: #4caf50;
+        background: rgba(76, 175, 80, 0.1);
+    }
+
+    .modified-risk {
+        border-color: #ff9800;
+        background: rgba(255, 152, 0, 0.1);
+    }
+
+    .old-risk {
+        border-color: #f44336;
+        background: rgba(244, 67, 54, 0.1);
+    }
+
+    .risk-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .risk-description {
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    .risk-impact, .risk-mitigation {
+        font-size: 0.95rem;
+        color: #555;
+        margin-bottom: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="h3 mb-4">Risk Report Comparison</h1>
+
+    <div class="row g-4">
+        <!-- Exchange Selection -->
+        <div class="col-12">
+            <div class="report-form p-4 mb-4">
+                <select id="exchange-select" class="form-select">
+                    <option value="">Select an exchange...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Left Form -->
+        <div class="col-md-6">
+            <div class="report-form p-4">
+                <h5 class="mb-3">Risk Report 1</h5>
+                <div class="mb-3">
+                    <label class="form-label">Security</label>
+                    <select class="form-select security-select" data-side="left">
+                        <option value="">Select a security...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Year</label>
+                    <select class="form-select year-select" data-side="left">
+                        <option value="">Select year...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Month</label>
+                    <select class="form-select month-select" data-side="left">
+                        <option value="">Select month...</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-search w-100" data-side="left">
+                    <span class="spinner-border spinner-border-sm loading-spinner"></span>
+                    <span class="btn-text">Load Risk Report</span>
+                </button>
+            </div>
+
+            <div class="report-container mt-4" id="left-report">
+                <div class="report-placeholder">
+                    <p class="mb-0">Select parameters and search to view the risk report</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Form -->
+        <div class="col-md-6">
+            <div class="report-form p-4">
+                <h5 class="mb-3">Risk Report 2</h5>
+                <div class="mb-3">
+                    <label class="form-label">Security</label>
+                    <select class="form-select security-select" data-side="right">
+                        <option value="">Select a security...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Year</label>
+                    <select class="form-select year-select" data-side="right">
+                        <option value="">Select year...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Month</label>
+                    <select class="form-select month-select" data-side="right">
+                        <option value="">Select month...</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-search w-100" data-side="right">
+                    <span class="spinner-border spinner-border-sm loading-spinner"></span>
+                    <span class="btn-text">Load Risk Report</span>
+                </button>
+            </div>
+
+            <div class="report-container mt-4" id="right-report">
+                <div class="report-placeholder">
+                    <p class="mb-0">Select parameters and search to view the risk report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const API_BASE = '{{ api_base_url }}';
+    const RISK_COMPARISONS_API = `${API_BASE}risk-comparisons/`;
+
+    // Cache DOM elements
+    const exchangeSelect = document.getElementById('exchange-select');
+    const securitySelects = document.querySelectorAll('.security-select');
+    const yearSelects = document.querySelectorAll('.year-select');
+    const monthSelects = document.querySelectorAll('.month-select');
+    const searchButtons = document.querySelectorAll('.btn-search');
+
+    // Initialize exchanges
+    fetch(`${RISK_COMPARISONS_API}available_exchanges/`)
+        .then(response => response.json())
+        .then(data => {
+            data.exchanges.forEach(exchange => {
+                exchangeSelect.add(new Option(exchange.name, exchange.id));
+            });
+        })
+        .catch(error => {
+            console.error('Error loading exchanges:', error);
+            exchangeSelect.innerHTML = '<option value="">Error loading exchanges</option>';
+        });
+
+    // Exchange change handler
+    exchangeSelect.addEventListener('change', function() {
+        const exchangeId = this.value;
+
+        securitySelects.forEach(select => {
+            select.innerHTML = '<option value="">Select a security...</option>';
+            select.disabled = true;
+        });
+
+        if (!exchangeId) return;
+
+        fetch(`${RISK_COMPARISONS_API}securities_by_exchange/?exchange_id=${exchangeId}`)
+            .then(response => response.json())
+            .then(data => {
+                securitySelects.forEach(select => {
+                    data.securities.forEach(security => {
+                        select.add(new Option(`${security.ticker} - ${security.name}`, security.id));
+                    });
+                    select.disabled = false;
+                });
+            })
+            .catch(error => {
+                console.error('Error loading securities:', error);
+                securitySelects.forEach(select => {
+                    select.innerHTML = '<option value="">Error loading securities</option>';
+                });
+            });
+    });
+
+    // Security change handler
+    securitySelects.forEach(select => {
+        select.addEventListener('change', function() {
+            const securityId = this.value;
+            const side = this.dataset.side;
+
+            const yearSelect = document.querySelector(`.year-select[data-side="${side}"]`);
+            const monthSelect = document.querySelector(`.month-select[data-side="${side}"]`);
+
+            yearSelect.innerHTML = '<option value="">Select year...</option>';
+            monthSelect.innerHTML = '<option value="">Select month...</option>';
+            yearSelect.disabled = true;
+            monthSelect.disabled = true;
+
+            if (!securityId) return;
+
+            fetch(`${RISK_COMPARISONS_API}available_dates/?security_id=${securityId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.years?.length) {
+                        yearSelect.innerHTML = '<option value="">No years available</option>';
+                        return;
+                    }
+
+                    data.years.forEach(year => {
+                        yearSelect.add(new Option(year, year));
+                    });
+                    yearSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error loading years:', error);
+                    yearSelect.innerHTML = '<option value="">Error loading years</option>';
+                });
+        });
+    });
+
+    // Year change handler
+    yearSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            const year = this.value;
+            const side = this.dataset.side;
+            const securityId = document.querySelector(`.security-select[data-side="${side}"]`).value;
+
+            const monthSelect = document.querySelector(`.month-select[data-side="${side}"]`);
+            monthSelect.innerHTML = '<option value="">Select month...</option>';
+            monthSelect.disabled = true;
+
+            if (!year || !securityId) return;
+
+            fetch(`${RISK_COMPARISONS_API}available_dates/?security_id=${securityId}&year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.months?.length) {
+                        monthSelect.innerHTML = '<option value="">No months available</option>';
+                        return;
+                    }
+
+                    data.months.forEach(month => {
+                        monthSelect.add(new Option(month.name, month.number));
+                    });
+                    monthSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error loading months:', error);
+                    monthSelect.innerHTML = '<option value="">Error loading months</option>';
+                });
+        });
+    });
+
+    function createRiskSection(title, risks, riskClass) {
+        if (!risks || !risks.length) return '';
+
+        return `
+            <div class="report-section mb-4">
+                <h4 class="section-header">${title}</h4>
+                <div class="section-content">
+                    ${risks.map(risk => {
+                        // Split the risk string into title and description
+                        const [riskTitle, ...descriptionParts] = risk.split('\n');
+                        const riskDescription = descriptionParts.join('\n');
+
+                        return `
+                            <div class="risk-item ${riskClass}">
+                                <h5 class="risk-title">${riskTitle || ''}</h5>
+                                <p class="risk-description">${riskDescription || ''}</p>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>`;
+    }
+
+    searchButtons.forEach(button => {
+        button.addEventListener('click', async function() {
+            const side = this.dataset.side;
+            const securityId = document.querySelector(`.security-select[data-side="${side}"]`).value;
+            const year = document.querySelector(`.year-select[data-side="${side}"]`).value;
+            const month = document.querySelector(`.month-select[data-side="${side}"]`).value;
+
+            if (!securityId || !year || !month) {
+                alert('Please select all required fields');
+                return;
+            }
+
+            const loadingSpinner = this.querySelector('.loading-spinner');
+            const btnText = this.querySelector('.btn-text');
+            const reportContainer = document.getElementById(`${side}-report`);
+
+            loadingSpinner.style.display = 'inline-block';
+            btnText.textContent = 'Loading...';
+            this.disabled = true;
+
+try {
+    const url = `${RISK_COMPARISONS_API}?security=${securityId}&year=${year}&month=${month}`;
+    console.log('Fetching report from:', url);
+    const response = await fetch(url);
+    const data = await response.json();
+    console.log('Report data received:', data);
+
+    if (!data.results || !data.results.length) {
+        throw new Error('No risk report found for the selected period');
+    }
+
+    const report = data.results[0];
+    console.log('Processing report:', report);
+
+    let reportHtml = '';
+
+    // Create sections for each risk type
+    reportHtml += createRiskSection('New Risks', report.new_risks, 'new-risk');
+    reportHtml += createRiskSection('Modified Risks', report.modified_risks, 'modified-risk');
+    reportHtml += createRiskSection('Old Risks', report.old_risks, 'old-risk');
+
+    if (!reportHtml) {
+        reportHtml = `
+            <div class="alert alert-info m-3">
+                <p class="mb-0">No risks found for the selected period</p>
+            </div>`;
+    }
+
+    reportContainer.innerHTML = reportHtml;
+
+} catch (error) {
+    console.error('Complete error details:', error);
+    reportContainer.innerHTML = `
+        <div class="alert alert-danger m-3">
+            <h6 class="alert-heading mb-1">Error Loading Risk Report</h6>
+            <p class="mb-0">${error.message}</p>
+        </div>`;
+} finally {
+                loadingSpinner.style.display = 'none';
+                btnText.textContent = 'Load Risk Report';
+                this.disabled = false;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

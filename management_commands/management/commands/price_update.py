@@ -51,7 +51,7 @@ class Command(BaseCommand):
             for security in tqdm(securities, desc="Updating securities"):
                 try:
                     with transaction.atomic():
-                        price_data_list = fetcher.fetch_data(security)
+                        price_data_list = fetcher.fetch_data(security, use_previous_day=True)
 
                         if price_data_list:
                             PriceData.objects.bulk_create([
