@@ -149,7 +149,7 @@
 <body>
     <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="{% url 'index' %}">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'fin_data:index' %}">
                 <img src="{% static 'images/logo.png' %}" alt="Finriv Logo" height="30" class="d-inline-block me-2">
                 Finriv
             </a>
@@ -163,25 +163,25 @@
                 <ul class="navbar-nav ms-auto gap-2">
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'metrics:metric_plotter' %}active{% endif %}"
-                           href="{% url 'financial_analysis' %}">
+                           href="{% url 'fin_data:financial_analysis' %}">
                            <i class="bi bi-graph-up me-1"></i> Metrics
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:screener' %}active{% endif %}"
-                           href="{% url 'screener' %}">
+                           href="{% url 'fin_data:screener' %}">
                            <i class="bi bi-funnel me-1"></i> Screener
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:financial_reports' %}active{% endif %}"
-                           href="{% url 'reports' %}">
+                           href="{% url 'fin_data:reports' %}">
                            <i class="bi bi-file-earmark-text me-1"></i> Reports
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:financial_risks' %}active{% endif %}"
-                           href="{% url 'risks' %}">
+                           href="{% url 'fin_data:risks' %}">
                            <i class="bi bi-shield-check me-1"></i> Risks
                         </a>
                     </li>

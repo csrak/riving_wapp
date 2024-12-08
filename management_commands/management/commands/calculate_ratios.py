@@ -74,11 +74,7 @@ class FinancialRatioCalculationService:
         Calculate financial ratios for a security at a given date
         """
         try:
-            # Get latest dividend update date
-            last_div_update_date = DividendData.objects.filter(
-                security=security
-            ).aggregate(max_date=Max('date'))['max_date']
-
+            # Get the most recent price data
             price_data = PriceData.objects.filter(
                 security=security
             ).order_by('-date').first()
@@ -87,40 +83,49 @@ class FinancialRatioCalculationService:
                 print(f"No price data for {security.ticker}")
                 return None
 
+            # If no specific date provided, use the price data date
+            if not date:
+                date = price_data.date
+
+            # Get latest financial data as of this date
+            latest_financial_data = FinancialData.objects.filter(
+                security=security,
+                date__lte=date  # Get latest data up to this date
+            ).order_by('-date').first()
+
+            if not latest_financial_data:
+                print(f"No financial data for {security.ticker} as of {date}")
+                return None
+
+            # Always use the financial data date for consistency
+            calculation_date = latest_financial_data.date
+
             # Get dividend data
             try:
-                latest_divs, before_divs = self.get_latest_dividend_total(security, datetime.now())
+                latest_divs, before_divs = self.get_latest_dividend_total(security, calculation_date)
             except Exception as e:
                 print(f"Problem obtaining dividends for {security.ticker}: {e}")
                 latest_divs = None
                 before_divs = None
 
+            # Initialize ratios with dividend calculations
             ratios = self._calculate_dividend_ratios(latest_divs, before_divs, price_data.price)
 
-            if not date:
-                date = last_div_update_date
-            else:
-                # Get latest financial data
-                latest_financial_data = FinancialData.objects.filter(
-                    security=security,
-                    date=date
-                ).first()
+            # Get quarterly data and calculate other ratios
+            quarterly_data = self.get_aggregated_quarterly_data(security, calculation_date)
+            if quarterly_data:
+                ratios.update(self._calculate_market_ratios(price_data, quarterly_data, latest_financial_data))
+                ratios.update(self._calculate_profitability_ratios(quarterly_data))
+                ratios.update(self._calculate_efficiency_ratios(quarterly_data, latest_financial_data))
 
-                if latest_financial_data:
-                    # Get quarterly data
-                    quarterly_data = self.get_aggregated_quarterly_data(security, date)
-                    if quarterly_data:
-                        # Calculate ratios
-                        ratios.update(self._calculate_market_ratios(price_data, quarterly_data, latest_financial_data))
-                        ratios.update(self._calculate_profitability_ratios(quarterly_data))
-                        ratios.update(self._calculate_efficiency_ratios(quarterly_data, latest_financial_data))
-
-            # Create or update FinancialRatio record
+            # Always create/update using the financial data date
             financial_ratio, created = FinancialRatio.objects.update_or_create(
                 security=security,
-                date=date,
-                price=price_data.price,
-                defaults=ratios
+                date=calculation_date,
+                defaults={
+                    'price': price_data.price,
+                    **ratios
+                }
             )
 
             return financial_ratio

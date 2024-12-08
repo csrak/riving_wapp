@@ -9,9 +9,12 @@ from .models import FinancialReport, FinancialRatio, RiskComparison, DividendDat
     Exchange
 from .serializers import FinancialReportSerializer, FinancialRatioSerializer, RiskComparisonSerializer, \
     DividendDataSerializer, PriceDataSerializer, FinancialDataSerializer
-from django.db.models import Sum
+from django.db.models import Sum, Max, F, ExpressionWrapper, FloatField,Q
 from django.utils.timezone import now
 from django.db.models import F, ExpressionWrapper, FloatField, Max
+import logging
+
+logger = logging.getLogger(__name__)
 
 # viewsets.py
 from rest_framework import viewsets
@@ -70,13 +73,38 @@ class BaseFinancialViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_latest_queryset(self):
         """
-        Get the latest data points for each security.
-        Used by ViewSets that support latest data retrieval.
+        Get the latest data points for each security, with a 1-day tolerance
+        to handle end-of-day updates.
         """
-        return self.get_queryset().order_by(
-            'security_id', '-date'
-        ).distinct('security_id')
+        queryset = self.get_queryset()
 
+        if not queryset.exists():
+            return queryset.none()
+
+        # Find the absolute latest date in the dataset
+        latest_possible_date = queryset.order_by('-date').values('date').first()['date']
+
+        # Allow for data from either the latest date or one day before
+        acceptable_dates = [
+            latest_possible_date,
+            latest_possible_date - timedelta(days=1)
+        ]
+
+        # Get securities with their latest dates
+        latest_dates = queryset.values('security').annotate(
+            max_date=Max('date')
+        )
+
+        # Build query for securities with data on either acceptable date
+        date_filters = Q()
+        for item in latest_dates:
+            if item['max_date'] in acceptable_dates:
+                date_filters |= Q(
+                    security=item['security'],
+                    date=item['max_date']
+                )
+
+        return queryset.filter(date_filters)
     @action(detail=False)
     def available_exchanges(self, request):
         """
@@ -292,30 +320,29 @@ class PriceDataViewSet(BaseFinancialViewSet):
         ticker = request.query_params.get('ticker')
         timeframe = request.query_params.get('timeframe', '1Y')
 
-        print(f"Received request for ticker: {ticker}, timeframe: {timeframe}")  # Debug log
-
-        if not ticker:
-            return Response({'error': 'Ticker is required'}, status=400)
-
         try:
-            # Get the security
             security = Security.objects.get(ticker=ticker)
-            print(f"Found security: {security}")  # Debug log
-
-            # Get all price data for this security
             queryset = PriceData.objects.filter(security=security)
 
-            # Get the date range
+            # Print the first few records to see what we're working with
+            print(f"First few records: {queryset.values()[:3]}")  # Debug print 2
+
             latest_date = queryset.order_by('-date').values('date').first()
+            print(f"Latest date: {latest_date}")
 
-            if not latest_date:
-                print(f"No data found for security: {security}")  # Debug log
-                return Response({'error': 'No data available'}, status=404)
+            # Get the latest available date using the same logic as get_latest_queryset
+            latest_possible_date = queryset.order_by('-date').values('date').first()['date']
+            print(f"Latest possible date: {latest_possible_date}")
+            # Define acceptable dates (today or yesterday)
+            acceptable_dates = [
+                latest_possible_date,
+                latest_possible_date - timedelta(days=1)
+            ]
 
-            latest_date = latest_date['date']
-            print(f"Latest date found: {latest_date}")  # Debug log
+            # Get the actual latest date with data
+            latest_date = latest_possible_date
 
-            # Calculate date range based on timeframe
+            # Calculate the start date based on timeframe
             if timeframe == '1W':
                 start_date = latest_date - timedelta(days=7)
             elif timeframe == '1M':
@@ -329,36 +356,33 @@ class PriceDataViewSet(BaseFinancialViewSet):
             else:  # 'Max'
                 start_date = None
 
-            # Get the data
+            # Filter data
             if start_date:
                 queryset = queryset.filter(date__gte=start_date)
 
             queryset = queryset.order_by('date')
 
-            # Check if we have data
-            data_count = queryset.count()
-            print(f"Found {data_count} records")  # Debug log
-
-            if data_count == 0:
+            if not queryset.exists():
                 return Response({
                     'error': f'No data available for {ticker} in the selected timeframe'
                 }, status=404)
 
-            # Get the data values
-            data = list(queryset.values(
-                'date',
-                'open_price',
-                'high_price',
-                'low_price',
-                'close_price',
-                'volume'
-            ))
-
-            # Format dates
-            for entry in data:
-                entry['date'] = entry['date'].strftime('%Y-%m-%d')
-
-            print(f"Returning {len(data)} records")  # Debug log
+            # Process data with explicit type conversion and None handling
+            data = []
+            for record in queryset:
+                try:
+                    data_point = {
+                        'date': record.date.strftime('%Y-%m-%d'),
+                        'open_price': float(record.open_price if record.open_price is not None else 0),
+                        'high_price': float(record.high_price if record.high_price is not None else 0),
+                        'low_price': float(record.low_price if record.low_price is not None else 0),
+                        'close_price': float(record.close_price if record.close_price is not None else 0),
+                        'volume': int(record.volume if record.volume is not None else 0)
+                    }
+                    data.append(data_point)
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Error processing record for {ticker} on {record.date}: {e}")
+                    continue
 
             return Response({
                 'data': data,
@@ -368,10 +392,9 @@ class PriceDataViewSet(BaseFinancialViewSet):
             })
 
         except Security.DoesNotExist:
-            print(f"Security not found: {ticker}")  # Debug log
             return Response({'error': f'Security {ticker} not found'}, status=404)
         except Exception as e:
-            print(f"Error in candlestick_data: {str(e)}")  # Debug log
+            logger.error(f"Error in candlestick_data: {str(e)}")
             return Response({'error': str(e)}, status=500)
 
 class DividendDataViewSet(BaseFinancialViewSet):

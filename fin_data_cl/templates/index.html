@@ -168,6 +168,16 @@
     .container {
         max-width: 1400px;
     }
+    .timeframe-selector {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    border-width: 1px;
+}
+
+.timeframe-selector.active {
+    background-color: #0d6efd;
+    color: white;
+}
 </style>
 {% endblock %}
 
@@ -232,6 +242,17 @@
             </div>
         </div>
     </div>
+    <!-- Timeframe selector -->
+<div class="d-flex justify-content-end mb-3">
+    <div class="btn-group">
+        <button class="btn btn-outline-primary timeframe-selector {% if current_timeframe == 'D' %}active{% endif %}"
+                data-timeframe="D">Daily</button>
+        <button class="btn btn-outline-primary timeframe-selector {% if current_timeframe == 'W' %}active{% endif %}"
+                data-timeframe="W">Weekly</button>
+        <button class="btn btn-outline-primary timeframe-selector {% if current_timeframe == 'M' %}active{% endif %}"
+                data-timeframe="M">Monthly</button>
+    </div>
+</div>
     <!-- Market Movers -->
     <div class="row g-4 mb-4">
         <div class="col-md-6">
@@ -402,95 +423,107 @@ function updateChartTitle(ticker, data) {
     }
 }
 
-    function fetchAndRenderChart(ticker, timeframe) {
-        if (!ticker) return;
+function fetchAndRenderChart(ticker, timeframe) {
+    if (!ticker) return;
 
-        showLoading();
-        const url = `${API_BASE}price-data/candlestick_data/?ticker=${ticker}&timeframe=${timeframe}`;
+    showLoading();
+    const url = `${API_BASE}price-data/candlestick_data/?ticker=${ticker}&timeframe=${timeframe}`;
 
-        fetch(url)
-            .then(response => response.json())
-            .then(result => {
-                if (result.error) {
-                    throw new Error(result.error);
+    fetch(url)
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            const data = result.data;
+            if (!data || !data.length) {
+                throw new Error('No data available');
+            }
+
+            // Validate and clean data before plotting
+            const validData = data.filter(d => (
+                d.open_price != null &&
+                d.high_price != null &&
+                d.low_price != null &&
+                d.close_price != null
+            ));
+
+            if (validData.length === 0) {
+                throw new Error('No valid price data available');
+            }
+
+            const plotData = [{
+                x: validData.map(d => d.date),
+                open: validData.map(d => Number(d.open_price) || 0),
+                high: validData.map(d => Number(d.high_price) || 0),
+                low: validData.map(d => Number(d.low_price) || 0),
+                close: validData.map(d => Number(d.close_price) || 0),
+                type: 'candlestick',
+                increasing: {line: {color: '#26a69a'}, fillcolor: '#26a69a'},
+                decreasing: {line: {color: '#ef5350'}, fillcolor: '#ef5350'},
+                hoverinfo: 'x+y',
+                hoverlabel: {
+                    bgcolor: '#1a237e',
+                    font: {color: 'white'}
                 }
+            }];
 
-                const data = result.data;
-                if (!data || !data.length) {
-                    throw new Error('No data available');
-                }
+            updateChartTitle(ticker, validData);
 
-                updateChartTitle(ticker, data);
+            const layout = {
+                dragmode: 'zoom',
+                showlegend: false,
+                xaxis: {
+                    type: 'date',
+                    rangeslider: {visible: false},
+                    gridcolor: '#f5f5f5',
+                    showgrid: true,
+                    zeroline: false
+                },
+                yaxis: {
+                    autorange: true,
+                    title: 'Price ($)',
+                    tickformat: '.2f',
+                    gridcolor: '#f5f5f5',
+                    showgrid: true,
+                    zeroline: false
+                },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                margin: {t: 10, r: 40, b: 20, l: 60},
+                hovermode: 'x unified'
+            };
 
-                const plotData = [{
-                    x: data.map(d => d.date),
-                    open: data.map(d => d.open_price),
-                    high: data.map(d => d.high_price),
-                    low: data.map(d => d.low_price),
-                    close: data.map(d => d.close_price),
-                    type: 'candlestick',
-                    increasing: {line: {color: '#26a69a'}, fillcolor: '#26a69a'},
-                    decreasing: {line: {color: '#ef5350'}, fillcolor: '#ef5350'},
-                    hoverinfo: 'x+y',
-                    hoverlabel: {
-                        bgcolor: '#1a237e',
-                        font: {color: 'white'}
-                    }
-                }];
-
-                const layout = {
-                    dragmode: 'zoom',
-                    showlegend: false,
-                    xaxis: {
-                        type: 'date',
-                        rangeslider: {visible: false},
-                        gridcolor: '#f5f5f5',
-                        showgrid: true,
-                        zeroline: false
-                    },
-                    yaxis: {
-                        autorange: true,
-                        title: 'Price ($)',
-                        tickformat: '$.2f',
-                        gridcolor: '#f5f5f5',
-                        showgrid: true,
-                        zeroline: false
-                    },
-                    plot_bgcolor: 'white',
-                    paper_bgcolor: 'white',
-                    margin: {t: 10, r: 40, b: 20, l: 60},
-                    hovermode: 'x unified'
-                };
-
-                Plotly.newPlot('stock-plot', plotData, layout, {
-                    responsive: true,
-                    scrollZoom: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: [
-                        'select2d',
-                        'lasso2d',
-                        'autoScale2d',
-                        'hoverClosestCartesian',
-                        'hoverCompareCartesian'
-                    ],
-                    displaylogo: false
-                });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('stock-plot').innerHTML = `
-                    <div class="alert alert-warning m-4">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
-                            <div>
-                                <h6 class="alert-heading mb-1">Unable to Load Data</h6>
-                                <p class="mb-0">Error: ${error.message}</p>
-                            </div>
+            Plotly.newPlot('stock-plot', plotData, layout, {
+                responsive: true,
+                scrollZoom: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: [
+                    'select2d',
+                    'lasso2d',
+                    'autoScale2d',
+                    'hoverClosestCartesian',
+                    'hoverCompareCartesian'
+                ],
+                displaylogo: false
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('stock-plot').innerHTML = `
+                <div class="alert alert-warning m-4">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <div>
+                            <h6 class="alert-heading mb-1">Unable to Load Data</h6>
+                            <p class="mb-0">Error: ${error.message}</p>
                         </div>
-                    </div>`;
-            })
-            .finally(hideLoading);
-    }
+                    </div>
+                </div>`;
+        })
+        .finally(hideLoading);
+}
 
     // Event Listeners
     document.querySelectorAll('.ticker-row').forEach(row => {
@@ -525,6 +558,16 @@ function updateChartTitle(ticker, data) {
         fetchAndRenderChart(defaultTicker, currentTimeframe);
         document.querySelector('.ticker-row').classList.add('table-active');
     }
+});
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle timeframe selection
+    document.querySelectorAll('.timeframe-selector').forEach(button => {
+        button.addEventListener('click', function() {
+            const timeframe = this.dataset.timeframe;
+            // Reload the page with the new timeframe
+            window.location.href = `?timeframe=${timeframe}`;
+        });
+    });
 });
 </script>
 {% endblock %}

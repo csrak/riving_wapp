@@ -21,7 +21,7 @@ from fin_data_cl import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('fin_data_cl.urls')),
-    path('api/v1/', include('fin_data_cl.api_urls', namespace='api')),
+    #path('api/v1/', include('fin_data_cl.api_urls', namespace='api')),
     path('plots/', include('price_plots.urls', namespace='plots')),
     path('metrics/', include('metrics_an.urls', namespace='metrics')),
     path('about/', views.about, name='about'),

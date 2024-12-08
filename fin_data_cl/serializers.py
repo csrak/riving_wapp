@@ -120,7 +120,7 @@ class FinancialRatioSerializer(BaseFinancialSerializer):
             'peg_ratio', 'ev_ebitda', 'gross_profit_margin',
             'operating_profit_margin', 'net_profit_margin',
             'return_on_assets', 'return_on_equity', 'debt_to_equity',
-            'current_ratio', 'quick_ratio', 'dividend_yield'
+            'current_ratio', 'quick_ratio', 'dividend_yield', 'price','before_dividend_yield',
         ]
 
     def to_representation(self, instance):

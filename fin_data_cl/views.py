@@ -257,22 +257,22 @@ def metric_plotter(request):
     })
 
 
-def get_data(request):
-    ticker = request.GET.get('ticker')
-    metrics = request.GET.getlist('metric[]')
-    fields_to_fetch = ['date'] + metrics
-    data = FinancialData.objects.filter(ticker=ticker).order_by('date').values(*fields_to_fetch)
-    return JsonResponse(list(data), safe=False)
-
-
-def ticker_suggestions(request):
-    query = request.GET.get('query', '')
-    suggestions = FinancialData.objects.filter(
-        ticker__icontains=query
-    ).values_list('ticker', flat=True).distinct().order_by('ticker')
-    return JsonResponse(list(suggestions), safe=False)
-
-
+# def get_data(request):
+#     ticker = request.GET.get('ticker')
+#     metrics = request.GET.getlist('metric[]')
+#     fields_to_fetch = ['date'] + metrics
+#     data = FinancialData.objects.filter(ticker=ticker).order_by('date').values(*fields_to_fetch)
+#     return JsonResponse(list(data), safe=False)
+#
+#
+# def ticker_suggestions(request):
+#     query = request.GET.get('query', '')
+#     suggestions = FinancialData.objects.filter(
+#         ticker__icontains=query
+#     ).values_list('ticker', flat=True).distinct().order_by('ticker')
+#     return JsonResponse(list(suggestions), safe=False)
+#
+#
 def about(request):
     return render(request, 'about.html')
 
@@ -280,73 +280,73 @@ def about(request):
 def contact(request):
     return render(request, 'contact.html')
 
-
-def get_price_data(security_id, period='1d'):
-    """Helper function to get price data for a specific period"""
-    latest_date = PriceData.objects.aggregate(Max('date'))['date__max']
-
-    if not latest_date:
-        return None
-
-    if period == '1d':
-        start_date = latest_date
-    elif period == '1w':
-        start_date = latest_date - timedelta(days=7)
-    elif period == '1m':
-        start_date = latest_date - timedelta(days=30)
-    elif period == '1y':
-        start_date = latest_date - timedelta(days=365)
-    elif period == '5y':
-        start_date = latest_date - timedelta(days=1825)
-    else:
-        start_date = latest_date
-
-    price_data = PriceData.objects.filter(
-        security_id=security_id,
-        date__gte=start_date
-    ).order_by('date').values(
-        'date', 'open_price', 'high_price',
-        'low_price', 'close_price', 'volume'
-    )
-
-    return list(price_data)
-
-
-def get_security_prices(request):
-    """AJAX endpoint for getting price data"""
-    security_id = request.GET.get('security_id')
-    period = request.GET.get('period', '1d')
-
-    if not security_id:
-        return JsonResponse({'error': 'Security ID required'}, status=400)
-
-    price_data = get_price_data(security_id, period)
-
-    if not price_data:
-        return JsonResponse({'error': 'No data available'}, status=404)
-
-    return JsonResponse({
-        'prices': price_data,
-        'period': period
-    })
-def save_session_data(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        form_id = data.pop('formId', None)
-
-        if not form_id:
-            return JsonResponse({'error': 'Form ID required'}, status=400)
-
-        for key, value in data.items():
-            request.session[f'{form_id}-{key}'] = value
-        request.session.modified = True
-
-        return JsonResponse({'status': 'success'})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+#
+# def get_price_data(security_id, period='1d'):
+#     """Helper function to get price data for a specific period"""
+#     latest_date = PriceData.objects.aggregate(Max('date'))['date__max']
+#
+#     if not latest_date:
+#         return None
+#
+#     if period == '1d':
+#         start_date = latest_date
+#     elif period == '1w':
+#         start_date = latest_date - timedelta(days=7)
+#     elif period == '1m':
+#         start_date = latest_date - timedelta(days=30)
+#     elif period == '1y':
+#         start_date = latest_date - timedelta(days=365)
+#     elif period == '5y':
+#         start_date = latest_date - timedelta(days=1825)
+#     else:
+#         start_date = latest_date
+#
+#     price_data = PriceData.objects.filter(
+#         security_id=security_id,
+#         date__gte=start_date
+#     ).order_by('date').values(
+#         'date', 'open_price', 'high_price',
+#         'low_price', 'close_price', 'volume'
+#     )
+#
+#     return list(price_data)
+#
+#
+# def get_security_prices(request):
+#     """AJAX endpoint for getting price data"""
+#     security_id = request.GET.get('security_id')
+#     period = request.GET.get('period', '1d')
+#
+#     if not security_id:
+#         return JsonResponse({'error': 'Security ID required'}, status=400)
+#
+#     price_data = get_price_data(security_id, period)
+#
+#     if not price_data:
+#         return JsonResponse({'error': 'No data available'}, status=404)
+#
+#     return JsonResponse({
+#         'prices': price_data,
+#         'period': period
+#     })
+# def save_session_data(request):
+#     if request.method != 'POST':
+#         return JsonResponse({'error': 'Method not allowed'}, status=405)
+#
+#     try:
+#         data = json.loads(request.body)
+#         form_id = data.pop('formId', None)
+#
+#         if not form_id:
+#             return JsonResponse({'error': 'Form ID required'}, status=400)
+#
+#         for key, value in data.items():
+#             request.session[f'{form_id}-{key}'] = value
+#         request.session.modified = True
+#
+#         return JsonResponse({'status': 'success'})
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=400)
 
 
 from django.urls import reverse

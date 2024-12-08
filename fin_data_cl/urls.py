@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import viewsets, views
 from .more_views import index
-
+app_name = 'fin_data'
 # Create router and register viewsets
 router = DefaultRouter()
 
