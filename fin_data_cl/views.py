@@ -6,13 +6,17 @@ from django.db.models.functions import Cast
 from .utils.search_view import generalized_search_view
 from .forms import FinancialReportSearchForm, FinancialRisksSearchForm
 from django.http import JsonResponse
+from django.template.exceptions import TemplateDoesNotExist
 from django.shortcuts import render
+from django.http import HttpResponse
+from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime, timedelta
 import json
 from django.template.loader import render_to_string
 from .viewsets import PriceDataViewSet
 from rest_framework.test import APIRequestFactory
+from django.conf import settings
 def get_securities_for_exchange(request, exchange_id):
     """Get securities for an exchange, ensuring they have associated data."""
     # Determine the model based on 'type' parameter
@@ -278,9 +282,27 @@ def about(request):
 
 
 def contact(request):
-    return render(request, 'contact.html')
+    if request.method == "POST":
+        # Get form data
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        message = request.POST.get('message', '').strip()
 
-#
+        # Define the directory and filename
+        messages_dir = os.path.join(settings.BASE_DIR, 'user_messages')
+        os.makedirs(messages_dir, exist_ok=True)  # Ensure the directory exists
+        message_file = os.path.join(messages_dir, f"{name}_{email.replace('@', '_')}.txt")
+
+        # Save the message to a file
+        with open(message_file, 'w', encoding='utf-8') as file:
+            file.write(f"Name: {name}\n")
+            file.write(f"Email: {email}\n")
+            file.write("Message:\n")
+            file.write(message)
+
+        return HttpResponse("Thank you for your message! We'll get back to you soon.")
+
+    return render(request, 'contact.html')
 # def get_price_data(security_id, period='1d'):
 #     """Helper function to get price data for a specific period"""
 #     latest_date = PriceData.objects.aggregate(Max('date'))['date__max']
@@ -366,6 +388,14 @@ def generic_data_view(request, template_name):
     print(f"Rendering template: {template_name}")
     print(f"Context being passed: {context}")
 
-    return render(request, f'{template_name}.html', context)
-
-
+    try:
+        # Attempt to render the requested template
+        return render(request, f'{template_name}.html', context)
+    except TemplateDoesNotExist:
+        # Log the missing template for debugging purposes
+        print(f"Template '{template_name}.html' does not exist. Rendering 'In Construction' page.")
+        return render(request, 'in_construction.html', context, status=404)
+    except Exception as e:
+        # Handle other exceptions if necessary
+        print(f"An unexpected error occurred: {e}")
+        return HttpResponse("An error occurred. Please try again later.", status=500)

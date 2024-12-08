@@ -1,0 +1,72 @@
+{% extends 'fin_data_cl/base.html' %}
+
+{% block title %}Contact - Cristian Rebolledo Espinoza{% endblock %}
+
+{% block extra_css %}
+<style>
+    .contact-container {
+        padding: 2rem 0;
+    }
+    .form-control {
+        border-radius: 6px;
+    }
+    .btn-submit {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        transition: all 0.3s;
+    }
+    .btn-submit:hover {
+        background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+        .social-icons a {
+        font-size: 1.5rem;
+        margin-right: 1rem;
+        color: var(--primary-color);
+        transition: color 0.3s;
+    }
+    .social-icons a:hover {
+        color: var(--secondary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container contact-container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h1 class="text-center mb-4">Contact Me</h1>
+            <form method="post" action="{% url 'contact' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="name" class="form-label">Your Name</label>
+                    <input type="text" class="form-control" id="name" name="name" maxlength="50" required>
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Your Email</label>
+                    <input type="email" class="form-control" id="email" name="email" maxlength="100" required>
+                </div>
+                <div class="mb-3">
+                    <label for="message" class="form-label">Your Message</label>
+                    <textarea class="form-control" id="message" name="message" rows="5" maxlength="500" required></textarea>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-submit">Send Message</button>
+                </div>
+            </form>
+                <div class="d-flex justify-content-end mt-3">
+                <div class="social-icons">
+                <a href="https://github.com/csrak" target="_blank" aria-label="GitHub"><i class="bi bi-github"></i></a>
+                <a href="https://www.linkedin.com/in/cristian-rebolledo-espinoza" target="_blank" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                <!-- Add other social links as needed -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

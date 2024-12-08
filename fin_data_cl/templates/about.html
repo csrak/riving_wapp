@@ -1,0 +1,42 @@
+{% extends 'fin_data_cl/base.html' %}
+
+{% block title %}About - Cristian Rebolledo Espinoza{% endblock %}
+
+{% block extra_css %}
+<style>
+    .about-container {
+        padding: 2rem 0;
+    }
+    .profile-image {
+        max-width: 150px;
+        border-radius: 50%;
+    }
+    .social-icons a {
+        font-size: 1.5rem;
+        margin-right: 1rem;
+        color: var(--primary-color);
+        transition: color 0.3s;
+    }
+    .social-icons a:hover {
+        color: var(--secondary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container about-container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="mb-3">Finriv is part of Riving Tools, developed by csrak</h1>
+            <p class="lead mb-4">
+                The site is in development and will be updated with new features and improvements. Some links may not work as expected yet.
+            </p>
+            <div class="social-icons">
+                <a href="https://github.com/csrak" target="_blank" aria-label="GitHub"><i class="bi bi-github"></i></a>
+                <a href="https://www.linkedin.com/in/cristian-rebolledo-espinoza" target="_blank" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                <!-- Add other social links as needed -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

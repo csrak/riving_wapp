@@ -93,12 +93,15 @@ class FinancialRatioCalculationService:
                 date__lte=date  # Get latest data up to this date
             ).order_by('-date').first()
 
-            if not latest_financial_data:
-                print(f"No financial data for {security.ticker} as of {date}")
-                return None
-
-            # Always use the financial data date for consistency
-            calculation_date = latest_financial_data.date
+            # Determine the calculation date: use financial data date or the latest dividend date
+            if latest_financial_data:
+                calculation_date = latest_financial_data.date
+            else:
+                latest_dividend = DividendData.objects.filter(
+                    security=security,
+                    date__lte=date
+                ).order_by('-date').first()
+                calculation_date = latest_dividend.date if latest_dividend else date
 
             # Get dividend data
             try:
@@ -111,14 +114,33 @@ class FinancialRatioCalculationService:
             # Initialize ratios with dividend calculations
             ratios = self._calculate_dividend_ratios(latest_divs, before_divs, price_data.price)
 
-            # Get quarterly data and calculate other ratios
-            quarterly_data = self.get_aggregated_quarterly_data(security, calculation_date)
-            if quarterly_data:
-                ratios.update(self._calculate_market_ratios(price_data, quarterly_data, latest_financial_data))
-                ratios.update(self._calculate_profitability_ratios(quarterly_data))
-                ratios.update(self._calculate_efficiency_ratios(quarterly_data, latest_financial_data))
+            # If financial data exists, calculate additional ratios
+            if latest_financial_data:
+                # Get quarterly data and calculate other ratios
+                quarterly_data = self.get_aggregated_quarterly_data(security, calculation_date)
+                if quarterly_data:
+                    ratios.update(self._calculate_market_ratios(price_data, quarterly_data, latest_financial_data))
+                    ratios.update(self._calculate_profitability_ratios(quarterly_data))
+                    ratios.update(self._calculate_efficiency_ratios(quarterly_data, latest_financial_data))
+            else:
+                # Populate other ratios with None
+                ratios.update({
+                    'pe_ratio': None,
+                    'pb_ratio': None,
+                    'ps_ratio': None,
+                    'peg_ratio': None,
+                    'ev_ebitda': None,
+                    'gross_profit_margin': None,
+                    'operating_profit_margin': None,
+                    'net_profit_margin': None,
+                    'return_on_assets': None,
+                    'return_on_equity': None,
+                    'debt_to_equity': None,
+                    'current_ratio': None,
+                    'quick_ratio': None,
+                })
 
-            # Always create/update using the financial data date
+            # Always create/update using the calculated date
             financial_ratio, created = FinancialRatio.objects.update_or_create(
                 security=security,
                 date=calculation_date,

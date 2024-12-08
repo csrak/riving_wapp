@@ -1,0 +1,64 @@
+{% extends 'fin_data_cl/base.html' %}
+
+{% block title %}Page Under Construction{% endblock %}
+
+{% block extra_css %}
+<style>
+    .construction-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 70vh;
+        text-align: center;
+    }
+
+    .construction-icon {
+        font-size: 6rem;
+        color: var(--primary-color);
+    }
+
+    .construction-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-top: 1rem;
+    }
+
+    .construction-message {
+        font-size: 1.25rem;
+        color: var(--text-muted);
+        margin: 1rem 0;
+    }
+
+    .btn-back-home {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        transition: all 0.3s;
+        text-decoration: none;
+    }
+
+    .btn-back-home:hover {
+        background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container construction-container">
+    <i class="bi bi-cone-striped construction-icon"></i>
+    <h1 class="construction-title">Page Under Construction</h1>
+    <p class="construction-message">
+        We're working hard to build this feature. Please check back later.
+    </p>
+    <a href="{% url 'fin_data:index' %}" class="btn btn-back-home">
+        <i class="bi bi-arrow-left-circle me-1"></i> Back to Home
+    </a>
+</div>
+{% endblock %}
