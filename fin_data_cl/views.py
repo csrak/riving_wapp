@@ -17,6 +17,7 @@ from django.template.loader import render_to_string
 from .viewsets import PriceDataViewSet
 from rest_framework.test import APIRequestFactory
 from django.conf import settings
+import os
 def get_securities_for_exchange(request, exchange_id):
     """Get securities for an exchange, ensuring they have associated data."""
     # Determine the model based on 'type' parameter

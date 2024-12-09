@@ -213,12 +213,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!exchangeId) return;
 
-        fetch(`${API_BASE}reports/exchanges/${exchangeId}/securities/`)
+        fetch(`${FINANCIAL_REPORTS_API}securities_by_exchange/?exchange_id=${exchangeId}`)
             .then(response => response.json())
             .then(data => {
                 securitySelects.forEach(select => {
                     data.securities.forEach(security => {
-                        select.add(new Option(security.name, security.id));
+                        select.add(new Option(`${security.ticker} - ${security.name}`, security.id));
                     });
                     select.disabled = false;
                 });
