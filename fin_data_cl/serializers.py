@@ -86,19 +86,51 @@ class PriceDataSerializer(BaseFinancialSerializer):
 
 class FinancialDataSerializer(BaseFinancialSerializer):
     """
-    Enhanced Financial Data serializer with computed ratios
+    Enhanced Financial Data serializer with comprehensive financial metrics and computed ratios
     """
+    # Related Fields
     security = SecuritySerializer(read_only=True)
+
+    # Computed Ratios
     profit_margin = serializers.SerializerMethodField()
+    current_ratio = serializers.SerializerMethodField()
+    quick_ratio = serializers.SerializerMethodField()
+    debt_to_equity = serializers.SerializerMethodField()
 
     class Meta(BaseFinancialSerializer.Meta):
         model = FinancialData
         fields = BaseFinancialSerializer.Meta.fields + [
-            'security', 'revenue', 'net_profit', 'operating_profit',
-            'eps', 'operating_eps', 'cash', 'assets', 'liabilities',
-            'equity', 'profit_margin'
-        ]
+            # Base Relations
+            'security',
 
+            # Profit & Revenue Metrics
+            'revenue', 'net_profit', 'operating_profit', 'non_controlling_profit',
+            'eps', 'operating_eps', 'interest_revenue', 'ebit',
+
+            # Cash Flow Metrics
+            'cash_from_sales', 'cash_from_yield', 'cash_from_rent',
+            'cash_to_payments', 'cash_to_other_payments', 'speculation_cash',
+            'net_operating_cashflows', 'net_investing_cashflows', 'net_financing_cashflows',
+
+            # Balance Sheet Items - Assets
+            'cash', 'current_assets', 'non_current_assets', 'assets',
+            'marketable_securities', 'current_other_assets', 'goodwill',
+            'intangible_assets', 'inventories', 'trade_receivables',
+            'prepayments', 'cash_on_hands', 'cash_on_banks', 'cash_short_investment',
+
+            # Balance Sheet Items - Liabilities & Equity
+            'liabilities', 'current_liabilities', 'current_payables',
+            'equity', 'shares', 'shares_authorized',
+
+            # Operational Metrics
+            'cost_of_sales', 'depreciation', 'interest',
+            'provisions_for_employees', 'employee_benefits',
+            'payment_for_supplies', 'payment_to_employees',
+            'dividends_paid', 'forex',
+
+            # Computed Ratios
+            'profit_margin', 'current_ratio', 'quick_ratio', 'debt_to_equity'
+        ]
     def get_profit_margin(self, obj):
         """Calculate profit margin as percentage"""
         if obj.revenue and obj.revenue != 0:
