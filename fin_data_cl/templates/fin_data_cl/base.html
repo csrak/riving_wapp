@@ -163,7 +163,7 @@
                 <ul class="navbar-nav ms-auto gap-2">
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'metrics:metric_plotter' %}active{% endif %}"
-                           href="{% url 'fin_data:financial_analysis' %}">
+                           href="{% url 'fin_data:metric_plotter' %}">
                            <i class="bi bi-graph-up me-1"></i> Metrics
                         </a>
                     </li>

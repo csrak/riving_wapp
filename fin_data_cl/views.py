@@ -1,23 +1,17 @@
 #fin_data_cl/views.py
-from django.urls import reverse
 from .models import FinancialData, FinancialRatio, FinancialReport, RiskComparison, PriceData, Security
 from django.db.models import Q, Subquery, OuterRef, Max, F, ExpressionWrapper, FloatField
-from django.db.models.functions import Cast
 from .utils.search_view import generalized_search_view
 from .forms import FinancialReportSearchForm, FinancialRisksSearchForm
 from django.http import JsonResponse
-from django.template.exceptions import TemplateDoesNotExist
 from django.shortcuts import render
+from django.template.exceptions import TemplateDoesNotExist
 from django.http import HttpResponse
-from django.core.mail import send_mail
-from django.core.serializers.json import DjangoJSONEncoder
-from datetime import datetime, timedelta
-import json
-from django.template.loader import render_to_string
-from .viewsets import PriceDataViewSet
-from rest_framework.test import APIRequestFactory
 from django.conf import settings
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 def get_securities_for_exchange(request, exchange_id):
     """Get securities for an exchange, ensuring they have associated data."""
     # Determine the model based on 'type' parameter
@@ -377,26 +371,86 @@ from django.urls import reverse
 
 def generic_data_view(request, template_name):
     """
-    Our generic view for serving templates with the correct API base URL.
-    We need to make sure we're providing the correct context.
+    Generic view for serving templates with environment-aware error handling.
+    Production environments will show user-friendly error pages while
+    development environments will show detailed debug information.
     """
     context = {
-        'api_base_url': '/api/v1/',  # This trailing slash is important
-        'debug': True,  # Adding debug flag to help troubleshoot
+        'api_base_url': '/api/v1/',
+        'debug': settings.DEBUG,
     }
 
-    # Let's log what template we're trying to render
-    print(f"Rendering template: {template_name}")
-    print(f"Context being passed: {context}")
-
     try:
-        # Attempt to render the requested template
         return render(request, f'{template_name}.html', context)
+
     except TemplateDoesNotExist:
-        # Log the missing template for debugging purposes
-        print(f"Template '{template_name}.html' does not exist. Rendering 'In Construction' page.")
-        return render(request, 'in_construction.html', context, status=404)
+        # Log the error
+        logger.warning(
+            f"Template '{template_name}.html' not found. "
+            f"Requested by user: {request.user}, "
+            f"IP: {request.META.get('REMOTE_ADDR')}"
+        )
+
+        if settings.DEBUG:
+            # In development, show detailed error
+            return render(
+                request,
+                'debug/template_not_found.html',
+                {
+                    **context,
+                    'template_name': template_name,
+                    'available_templates': _get_available_templates(),
+                },
+                status=404
+            )
+        else:
+            # In production, show generic "In Construction" page
+            return render(request, 'errors/in_construction.html', context, status=404)
+
     except Exception as e:
-        # Handle other exceptions if necessary
-        print(f"An unexpected error occurred: {e}")
-        return HttpResponse("An error occurred. Please try again later.", status=500)
+        # Log the error with full traceback
+        logger.error(
+            f"Error rendering template '{template_name}.html'",
+            exc_info=True,
+            extra={
+                'request': request,
+                'template': template_name,
+            }
+        )
+
+        if settings.DEBUG:
+            # Re-raise the exception in development for full traceback
+            raise
+        else:
+            # In production, show generic error page
+            return render(
+                request,
+                'errors/500.html',
+                context,
+                status=500
+            )
+
+
+def _get_available_templates():
+    """
+    Helper function to list available templates for debug view.
+    Only called in development when a template is not found.
+    """
+    from django.template.loader import get_template
+    from django.template.loaders.app_directories import get_app_template_dirs
+    import os
+
+    template_dirs = get_app_template_dirs('templates')
+    available_templates = []
+
+    for template_dir in template_dirs:
+        for root, _, files in os.walk(template_dir):
+            for file in files:
+                if file.endswith('.html'):
+                    template_path = os.path.join(
+                        root.replace(str(template_dir), '').lstrip('/'),
+                        file
+                    )
+                    available_templates.append(template_path)
+
+    return sorted(available_templates)

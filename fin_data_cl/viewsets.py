@@ -1,30 +1,19 @@
 # viewsets.py
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from django.db.models.functions import ExtractYear, ExtractMonth
-from django.utils import timezone
-from datetime import timedelta
 from .models import FinancialReport, FinancialRatio, RiskComparison, DividendData, PriceData, FinancialData, Security, \
     Exchange
 from .serializers import FinancialReportSerializer, FinancialRatioSerializer, RiskComparisonSerializer, \
     DividendDataSerializer, PriceDataSerializer, FinancialDataSerializer
-from django.db.models import Sum, Max, F, ExpressionWrapper, FloatField,Q
-from django.utils.timezone import now
-from django.db.models import F, ExpressionWrapper, FloatField, Max
 import logging
-
 logger = logging.getLogger(__name__)
-
-# viewsets.py
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models.functions import ExtractYear, ExtractMonth
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Sum, Max
+from django.db.models import Sum, Max, Q, DecimalField
 import calendar
+
 
 class BaseFinancialViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -423,11 +412,55 @@ class DividendDataViewSet(BaseFinancialViewSet):
 
 
 class FinancialDataViewSet(BaseFinancialViewSet):
-    """ViewSet for financial statement data."""
+    """ViewSet for financial statement data with enhanced metric plotting capabilities."""
     model = FinancialData
     serializer_class = FinancialDataSerializer
     supports_latest = True
     queryset = FinancialData.objects.all().order_by('-date')
+
+    @action(detail=False, methods=['GET'])
+    def metrics(self, request):
+        """Return available metrics for plotting."""
+        metrics = [
+            {'field': field.name, 'display_name': field.verbose_name}
+            for field in self.model._meta.fields
+            if isinstance(field, DecimalField)
+        ]
+        return Response(metrics)
+
+    def list(self, request, *args, **kwargs):
+        """Enhanced list method to support metric plotting."""
+        security_id = request.query_params.get('security')
+        metrics = request.query_params.get('metrics', '').split(',')
+        start_date = request.query_params.get('start_date')
+
+        if not security_id or not metrics or '' in metrics:
+            return super().list(request, *args, **kwargs)
+
+        queryset = self.get_queryset().filter(security_id=security_id)
+
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+
+        # Optimize query by selecting only needed fields
+        fields_to_select = ['date'] + metrics
+        queryset = queryset.values(*fields_to_select)
+
+        # Transform data for plotting
+        dates = []
+        metric_data = {metric: [] for metric in metrics}
+
+        for entry in queryset:
+            dates.append(entry['date'])
+            for metric in metrics:
+                metric_data[metric].append(float(entry[metric]) if entry[metric] else None)
+
+        response_data = {
+            'dates': dates,
+            **metric_data
+        }
+
+        return Response(response_data)
 
 
 class FinancialReportViewSet(BaseFinancialViewSet):

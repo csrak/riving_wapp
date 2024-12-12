@@ -1,156 +1,315 @@
 {% extends "fin_data_cl/base.html" %}
+{% load static %}
 
-{% block title %}Metric Plotter{% endblock %}
+{% block title %}Financial Metrics Plotter{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plot-container {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .controls-container {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .time-range-btn.active {
+        background-color: var(--primary-color) !important;
+        border-color: var(--primary-color) !important;
+    }
+
+    .metric-select {
+        border: 1px solid var(--border-color);
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        visibility: hidden;
+    }
+
+    .loading-spinner {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h1 class="card-title text-center mb-4">Financial Metric Plotter</h1>
-            <form id="metric-form" class="row g-3">
-                <div class="col-md-6">
-                    <label for="ticker_search" class="form-label">Search Ticker</label>
-                    <input type="text" id="ticker_search" class="form-control" placeholder="Search ticker...">
-                </div>
-                <div class="col-md-6">
-                    <label for="ticker_dropdown" class="form-label">Select Ticker</label>
-                    <select id="ticker_dropdown" class="form-select">
-                        {% for ticker in tickers %}
-                            <option value="{{ ticker }}">{{ ticker }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="metric_dropdown" class="form-label">Select Metric (Max 3)</label>
-                    <select id="metric_dropdown" class="form-select">
-                        {% for metric in metrics %}
-                            <option value="{{ metric }}">{{ metric }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-12">
-                    <button type="button" id="add_metric_button" class="btn btn-secondary mt-2">Add Metric</button>
-                </div>
-                <div class="col-md-12">
-                    <div id="selected_metrics"></div>
-                </div>
-                <div class="col-md-12 text-center">
-                    <button type="button" id="get_data_button" class="btn btn-primary mt-4">Get</button>
-                </div>
-            </form>
+<div class="controls-container">
+    <div class="row">
+        <div class="col-md-4">
+            <label for="exchange-select" class="form-label">Exchange</label>
+            <select id="exchange-select" class="form-select">
+                <option value="">Select Exchange</option>
+            </select>
         </div>
-    </div>
-    <div class="card mt-5 shadow-sm">
-        <div class="card-body">
-            <div id="plot_area" style="width:100%; height:500px;"></div>
+        <div class="col-md-4">
+            <label for="security-select" class="form-label">Security</label>
+            <select id="security-select" class="form-select" disabled>
+                <option value="">Select Security</option>
+            </select>
         </div>
     </div>
 
-    <script>
-        $(document).ready(function() {
-            let selectedMetrics = [];
-            const maxMetrics = 3;
+    <div class="row mt-4">
+        <div class="col-12">
+            <label class="form-label">Metrics (Select up to 3)</label>
+            <div id="metrics-container">
+                <div class="metric-select">
+                    <select class="form-select metric-dropdown" disabled>
+                        <option value="">Select Metric</option>
+                    </select>
+                </div>
+            </div>
+            <button id="add-metric-btn" class="btn btn-outline-primary mt-2" disabled>
+                <i class="bi bi-plus-circle"></i> Add Metric
+            </button>
+        </div>
+    </div>
 
-            // Real-time ticker suggestions
-            $('#ticker_search').on('keyup', function() {
-                var query = $(this).val();
-                $.ajax({
-                    url: '{% url "ticker_suggestions" %}',
-                    data: {'query': query},
-                    success: function(data) {
-                        $('#ticker_dropdown').empty();
-                        $.each(data, function(index, ticker) {
-                            $('#ticker_dropdown').append('<option value="' + ticker + '">' + ticker + '</option>');
-                        });
-                    }
-                });
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="btn-group" role="group" aria-label="Time range">
+                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="1">1Y</button>
+                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="3">3Y</button>
+                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="5">5Y</button>
+                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="10">10Y</button>
+                <button type="button" class="btn btn-outline-primary time-range-btn active" data-range="max">Max</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="plot-container position-relative">
+    <div class="loading-overlay">
+        <div class="spinner-border text-primary loading-spinner" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    <div id="metrics-plot"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const API_BASE_URL = '{{ api_base_url }}';
+    let currentMetrics = 1;
+    const MAX_METRICS = 3;
+    let plot = null;
+
+    // Utility functions
+    function showLoading() {
+        document.querySelector('.loading-overlay').style.visibility = 'visible';
+    }
+
+    function hideLoading() {
+        document.querySelector('.loading-overlay').style.visibility = 'hidden';
+    }
+
+    function formatDate(date) {
+        return new Date(date).toLocaleDateString();
+    }
+
+    // Initialize exchanges
+    async function loadExchanges() {
+        try {
+            const response = await fetch(`${API_BASE_URL}exchanges/`);
+            const data = await response.json();
+            const select = document.getElementById('exchange-select');
+
+            data.forEach(exchange => {
+                const option = document.createElement('option');
+                option.value = exchange.id;
+                option.textContent = exchange.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            handleAjaxError(error);
+        }
+    }
+
+    // Load securities for selected exchange
+    async function loadSecurities(exchangeId) {
+        try {
+            showLoading();
+            const response = await fetch(`${API_BASE_URL}securities/?exchange=${exchangeId}`);
+            const data = await response.json();
+            const select = document.getElementById('security-select');
+
+            select.innerHTML = '<option value="">Select Security</option>';
+            data.forEach(security => {
+                const option = document.createElement('option');
+                option.value = security.id;
+                option.textContent = `${security.symbol} - ${security.name}`;
+                select.appendChild(option);
             });
 
-            // Add metric
-            $('#add_metric_button').on('click', function() {
-                const metric = $('#metric_dropdown').val();
-                if (selectedMetrics.length < maxMetrics && !selectedMetrics.includes(metric)) {
-                    selectedMetrics.push(metric);
-                    updateSelectedMetricsDisplay();
-                }
+            select.disabled = false;
+        } catch (error) {
+            handleAjaxError(error);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // Load available metrics
+    async function loadMetrics() {
+        try {
+            const response = await fetch(`${API_BASE_URL}financial-data/metrics/`);
+            const data = await response.json();
+            const dropdowns = document.querySelectorAll('.metric-dropdown');
+
+            dropdowns.forEach(dropdown => {
+                dropdown.innerHTML = '<option value="">Select Metric</option>';
+                data.forEach(metric => {
+                    const option = document.createElement('option');
+                    option.value = metric.field;
+                    option.textContent = metric.display_name;
+                    dropdown.appendChild(option);
+                });
+                dropdown.disabled = false;
             });
+        } catch (error) {
+            handleAjaxError(error);
+        }
+    }
 
-            // Update selected metrics display
-            function updateSelectedMetricsDisplay() {
-                $('#selected_metrics').empty();
-                selectedMetrics.forEach(function(metric, index) {
-                    $('#selected_metrics').append(
-                        '<span class="badge bg-primary metric-label" data-metric="' + metric + '">' + metric +
-                        ' <button type="button" class="btn-close btn-close-white btn-sm remove-metric" data-metric="' + metric + '" aria-label="Remove"></button></span>'
-                    );
-                });
+    // Fetch and plot financial data
+    async function updatePlot() {
+        const securityId = document.getElementById('security-select').value;
+        if (!securityId) return;
 
-                // Add remove functionality
-                $('.remove-metric').on('click', function() {
-                    const metricToRemove = $(this).data('metric');
-                    selectedMetrics = selectedMetrics.filter(function(metric) {
-                        return metric !== metricToRemove;
-                    });
-                    updateSelectedMetricsDisplay();
-                });
-            }
+        const selectedMetrics = Array.from(document.querySelectorAll('.metric-dropdown'))
+            .map(dropdown => dropdown.value)
+            .filter(value => value);
 
-            // Get data and plot
-            $('#get_data_button').on('click', function() {
-                const ticker = $('#ticker_dropdown').val();
-                if (selectedMetrics.length === 0) {
-                    alert('Please select at least one metric.');
-                    return;
-                }
+        if (selectedMetrics.length === 0) return;
 
-                $.ajax({
-                    url: '{% url "get_data" %}',
-                    data: {'ticker': ticker, 'metric': selectedMetrics},
-                    success: function(data) {
-                        let traces = [];
-                        selectedMetrics.forEach(function(metric, index) {
-                            const dates = data.map(function(d) { return d.date; });
-                            const values = data.map(function(d) { return d[metric]; });
+        const timeRange = document.querySelector('.time-range-btn.active').dataset.range;
+        const today = new Date();
+        let startDate = new Date();
 
-                            traces.push({
-                                x: dates,
-                                y: values,
-                                name: metric,
-                                type: 'scatter',
-                                mode: 'lines+markers',
-                                yaxis: 'y' + (index + 1),
-                                line: { color: ['#007bff', '#28a745', '#dc3545'][index] }
-                            });
-                        });
+        if (timeRange !== 'max') {
+            startDate.setFullYear(today.getFullYear() - parseInt(timeRange));
+        }
 
-                        const layout = {
-                            title: ticker + ' - Metrics Over Time',
-                            xaxis: { title: 'Date' },
-                            yaxis: { title: selectedMetrics[0], side: 'left', showline: true },
-                        };
+        try {
+            showLoading();
+            const response = await fetch(
+                `${API_BASE_URL}financial-data/?security=${securityId}&metrics=${selectedMetrics.join(',')}&start_date=${startDate.toISOString()}`
+            );
+            const data = await response.json();
 
-                        // Add additional Y-axes
-                        if (selectedMetrics.length > 1) {
-                            layout['yaxis2'] = {
-                                title: selectedMetrics[1],
-                                overlaying: 'y',
-                                side: 'right',
-                                showline: true
-                            };
-                        }
-                        if (selectedMetrics.length > 2) {
-                            layout['yaxis3'] = {
-                                title: selectedMetrics[2],
-                                overlaying: 'y',
-                                side: 'right',
-                                position: 0.85,
-                                showline: true
-                            };
-                        }
+            const traces = selectedMetrics.map(metric => ({
+                x: data.dates,
+                y: data[metric],
+                name: document.querySelector(`option[value="${metric}"]`).textContent,
+                type: 'scatter'
+            }));
 
-                        Plotly.newPlot('plot_area', traces, layout);
-                    }
-                });
+            const layout = {
+                title: 'Financial Metrics Over Time',
+                xaxis: { title: 'Date' },
+                yaxis: { title: 'Value' },
+                showlegend: true,
+                height: 600
+            };
+
+            Plotly.newPlot('metrics-plot', traces, layout);
+        } catch (error) {
+            handleAjaxError(error);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // Event Listeners
+    document.getElementById('exchange-select').addEventListener('change', (e) => {
+        if (e.target.value) {
+            loadSecurities(e.target.value);
+        } else {
+            document.getElementById('security-select').disabled = true;
+        }
+    });
+
+    document.getElementById('security-select').addEventListener('change', (e) => {
+        if (e.target.value) {
+            loadMetrics();
+            document.getElementById('add-metric-btn').disabled = false;
+        }
+        updatePlot();
+    });
+
+    document.getElementById('add-metric-btn').addEventListener('click', () => {
+        if (currentMetrics < MAX_METRICS) {
+            const container = document.getElementById('metrics-container');
+            const newMetric = document.createElement('div');
+            newMetric.className = 'metric-select';
+            newMetric.innerHTML = `
+                <div class="d-flex gap-2">
+                    <select class="form-select metric-dropdown">
+                        <option value="">Select Metric</option>
+                    </select>
+                    <button class="btn btn-outline-danger remove-metric-btn">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(newMetric);
+            loadMetrics();
+            currentMetrics++;
+        }
+
+        if (currentMetrics >= MAX_METRICS) {
+            document.getElementById('add-metric-btn').disabled = true;
+        }
+    });
+
+    document.getElementById('metrics-container').addEventListener('click', (e) => {
+        if (e.target.closest('.remove-metric-btn')) {
+            e.target.closest('.metric-select').remove();
+            currentMetrics--;
+            document.getElementById('add-metric-btn').disabled = false;
+            updatePlot();
+        }
+    });
+
+    document.getElementById('metrics-container').addEventListener('change', (e) => {
+        if (e.target.classList.contains('metric-dropdown')) {
+            updatePlot();
+        }
+    });
+
+    document.querySelector('.btn-group').addEventListener('click', (e) => {
+        if (e.target.classList.contains('time-range-btn')) {
+            document.querySelectorAll('.time-range-btn').forEach(btn => {
+                btn.classList.remove('active');
             });
-        });
-    </script>
+            e.target.classList.add('active');
+            updatePlot();
+        }
+    });
+
+    // Initialize
+    loadExchanges();
+</script>
 {% endblock %}

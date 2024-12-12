@@ -15,7 +15,7 @@ VIEWSET_MAPPING = {
     },
     'financial-data': {
         'viewset': viewsets.FinancialDataViewSet,
-        'templates': ['financial_analysis']
+        'templates': ['financial_analysis', 'metric_plotter']
     },
     'financial-ratios': {
         'viewset': viewsets.FinancialRatioViewSet,
