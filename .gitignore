@@ -49,6 +49,7 @@ atlassian-ide-plugin.xml
 *$py.class 
 
 # Distribution / packaging 
+staticfiles/
 .Python build/ 
 develop-eggs/ 
 dist/ 
