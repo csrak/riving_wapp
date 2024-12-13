@@ -254,9 +254,9 @@ def index(request):
         # Standard analysis tools definition
         analysis_tools = [
             {
-                'name': 'Price Analysis',
-                'description': 'Historical price trends and patterns',
-                'url': f"{settings.API_BASE_URL}price-data/"
+                'name': 'Metric Ploter',
+                'description': 'Plot and compare key metrics',
+                'url': f"/metric_plotter/"
             },
             {
                 'name': 'Stock Screener',
@@ -264,14 +264,14 @@ def index(request):
                 'url': '/screener/'
             },
             {
-                'name': 'Financial Ratios',
-                'description': 'Compare company metrics',
-                'url': f"{settings.API_BASE_URL}financial-ratios/"
+                'name': 'Financial Reports & Statements',
+                'description': 'Compare AI Summarized Reports for Companies and Quarters',
+                'url': f"/reports/"
             },
             {
-                'name': 'Risk Analysis',
-                'description': 'Evaluate investment risks',
-                'url': f"{settings.API_BASE_URL}risk-comparisons/"
+                'name': 'Financial Risks',
+                'description': 'Compare AI Summarized Risks and historical changes from Companies Reports',
+                'url': f"/risks/"
             }
         ]
 
