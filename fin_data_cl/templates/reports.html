@@ -85,6 +85,66 @@
         justify-content: center;
         height: 100%;
         color: #6c757d;
+   }
+           .risk-item, .metric-item, .change-item, .outlook-item, .business-overview {
+    border-left: 4px solid;
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+    background: #ffffff;
+    }
+
+    /* Business Overview Section */
+    .business-overview {
+        border-color: #1a237e;  /* Dark blue */
+        background: rgba(26,35,126,0.05);
+    }
+
+    /* Metrics Section */
+    .metric-item {
+        border-color: #0d47a1;  /* Medium blue */
+        background: rgba(13,71,161,0.05);
+        padding: 0.75rem 1rem;
+    }
+
+    /* Historical Changes Section */
+    .change-item {
+        border-color: #1565c0;  /* Light blue */
+        background: rgba(21,101,192,0.05);
+    }
+
+    /* Future Outlook Section */
+    .outlook-item {
+        border-color: #283593;  /* Deep blue */
+        background: rgba(40,53,147,0.05);
+    }
+
+    /* Titles within items */
+    .change-title, .outlook-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1a237e;
+    }
+
+    /* Descriptions */
+    .change-description, .outlook-description {
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+
+    /* Additional information rows */
+    .metric-item strong,
+    .change-date, .change-impact,
+    .outlook-timeline, .outlook-impact {
+        font-size: 0.95rem;
+        color: #555;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Metric items specific styling */
+    .metric-item strong {
+        color: #1a237e;
+        font-weight: 600;
     }
 </style>
 {% endblock %}
@@ -355,89 +415,71 @@ searchButtons.forEach(button => {
             const report = data.results[0];
             let reportHtml = '';
 
-            // Business Overview - already text, just needs the filter
-            if (report.business_overview) {
-                const businessOverviewHtml = marked.parse(report.business_overview);
+        // Business Overview
+        if (report.business_overview) {
+            const businessOverviewHtml = marked.parse(report.business_overview);
 
-                reportHtml += `
-                    <div class="report-section mb-4">
-                        <h4 class="section-header">Business Overview</h4>
-                        <div class="section-content">
+            reportHtml += `
+                <div class="report-section mb-4">
+                    <h4 class="section-header">Business Overview</h4>
+                    <div class="section-content">
+                        <div class="business-overview">
                             ${businessOverviewHtml}
                         </div>
-                    </div>`;
-            }
+                    </div>
+                </div>`;
+        }
 
+        // Metrics
+        if (report.metrics) {
+            reportHtml += `
+                <div class="report-section mb-4">
+                    <h4 class="section-header">Key Metrics</h4>
+                    <div class="section-content">
+                        ${Object.entries(report.metrics).map(([key, value]) => `
+                            <div class="metric-item">
+                                <strong>${key}:</strong> ${value}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
 
-            // Risks - array of objects that need formatting
-            if (report.risks && Array.isArray(report.risks)) {
-                reportHtml += `
-                    <div class="report-section mb-4">
-                        <h4 class="section-header">Risks Analysis</h4>
-                        <div class="section-content">
-                            ${report.risks.map(risk => `
-                                <div class="risk-item mb-3">
-                                    <h5 class="risk-title">${risk.title || ''}</h5>
-                                    <p class="risk-description">${risk.description || ''}</p>
-                                    ${risk.impact ? `<p class="risk-impact"><strong>Impact:</strong> ${risk.impact}</p>` : ''}
-                                    ${risk.mitigation ? `<p class="risk-mitigation"><strong>Mitigation:</strong> ${risk.mitigation}</p>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>`;
-            }
+        // Historical Changes
+        if (report.historical_changes && Array.isArray(report.historical_changes)) {
+            reportHtml += `
+                <div class="report-section mb-4">
+                    <h4 class="section-header">Historical Changes</h4>
+                    <div class="section-content">
+                        ${report.historical_changes.map(change => `
+                            <div class="change-item">
+                                <h5 class="change-title">${change.title || ''}</h5>
+                                <p class="change-description">${change.description || ''}</p>
+                                ${change.date ? `<p class="change-date"><strong>Date:</strong> ${change.date}</p>` : ''}
+                                ${change.impact ? `<p class="change-impact"><strong>Impact:</strong> ${change.impact}</p>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
 
-            // Metrics - object with metric data
-            if (report.metrics) {
-                reportHtml += `
-                    <div class="report-section mb-4">
-                        <h4 class="section-header">Key Metrics</h4>
-                        <div class="section-content">
-                            ${Object.entries(report.metrics).map(([key, value]) => `
-                                <div class="metric-item mb-2">
-                                    <strong>${key}:</strong> ${value}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>`;
-            }
-
-            // Historical Changes - array of changes
-            if (report.historical_changes && Array.isArray(report.historical_changes)) {
-                reportHtml += `
-                    <div class="report-section mb-4">
-                        <h4 class="section-header">Historical Changes</h4>
-                        <div class="section-content">
-                            ${report.historical_changes.map(change => `
-                                <div class="change-item mb-3">
-                                    <h5 class="change-title">${change.title || ''}</h5>
-                                    <p class="change-description">${change.description || ''}</p>
-                                    ${change.date ? `<p class="change-date"><strong>Date:</strong> ${change.date}</p>` : ''}
-                                    ${change.impact ? `<p class="change-impact"><strong>Impact:</strong> ${change.impact}</p>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>`;
-            }
-
-            // Future Outlook - array of outlook items
-            if (report.future_outlook && Array.isArray(report.future_outlook)) {
-                reportHtml += `
-                    <div class="report-section mb-4">
-                        <h4 class="section-header">Future Outlook</h4>
-                        <div class="section-content">
-                            ${report.future_outlook.map(outlook => `
-                                <div class="outlook-item mb-3">
-                                    <h5 class="outlook-title">${outlook.title || ''}</h5>
-                                    <p class="outlook-description">${outlook.description || ''}</p>
-                                    ${outlook.timeline ? `<p class="outlook-timeline"><strong>Timeline:</strong> ${outlook.timeline}</p>` : ''}
-                                    ${outlook.potential_impact ? `<p class="outlook-impact"><strong>Potential Impact:</strong> ${outlook.potential_impact}</p>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>`;
-            }
-
+        // Future Outlook
+        if (report.future_outlook && Array.isArray(report.future_outlook)) {
+            reportHtml += `
+                <div class="report-section mb-4">
+                    <h4 class="section-header">Future Outlook</h4>
+                    <div class="section-content">
+                        ${report.future_outlook.map(outlook => `
+                            <div class="outlook-item">
+                                <h5 class="outlook-title">${outlook.title || ''}</h5>
+                                <p class="outlook-description">${outlook.description || ''}</p>
+                                ${outlook.timeline ? `<p class="outlook-timeline"><strong>Timeline:</strong> ${outlook.timeline}</p>` : ''}
+                                ${outlook.potential_impact ? `<p class="outlook-impact"><strong>Potential Impact:</strong> ${outlook.potential_impact}</p>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
             reportContainer.innerHTML = reportHtml;
 
         } catch (error) {
