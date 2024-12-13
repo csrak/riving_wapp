@@ -412,17 +412,17 @@ class DividendDataViewSet(BaseFinancialViewSet):
 
 
 class FinancialDataViewSet(BaseFinancialViewSet):
-    """ViewSet for financial statement data with enhanced metric plotting capabilities."""
+    """ViewSet for financial statement data with metric plotting capabilities."""
     model = FinancialData
     serializer_class = FinancialDataSerializer
     supports_latest = True
-    queryset = FinancialData.objects.all().order_by('-date')
+    supports_time_range = True  # Enable time range support for plotting
 
     @action(detail=False, methods=['GET'])
     def metrics(self, request):
         """Return available metrics for plotting."""
         metrics = [
-            {'field': field.name, 'display_name': field.verbose_name}
+            {'field': field.name, 'display_name': field.verbose_name or field.name.replace('_', ' ').title()}
             for field in self.model._meta.fields
             if isinstance(field, DecimalField)
         ]
@@ -430,17 +430,12 @@ class FinancialDataViewSet(BaseFinancialViewSet):
 
     def list(self, request, *args, **kwargs):
         """Enhanced list method to support metric plotting."""
-        security_id = request.query_params.get('security')
         metrics = request.query_params.get('metrics', '').split(',')
-        start_date = request.query_params.get('start_date')
-
-        if not security_id or not metrics or '' in metrics:
+        if not metrics or '' in metrics:
             return super().list(request, *args, **kwargs)
 
-        queryset = self.get_queryset().filter(security_id=security_id)
-
-        if start_date:
-            queryset = queryset.filter(date__gte=start_date)
+        # Use the base class queryset with our existing filters
+        queryset = self.get_queryset()
 
         # Optimize query by selecting only needed fields
         fields_to_select = ['date'] + metrics
@@ -453,14 +448,12 @@ class FinancialDataViewSet(BaseFinancialViewSet):
         for entry in queryset:
             dates.append(entry['date'])
             for metric in metrics:
-                metric_data[metric].append(float(entry[metric]) if entry[metric] else None)
+                metric_data[metric].append(float(entry[metric]) if entry[metric] is not None else None)
 
-        response_data = {
+        return Response({
             'dates': dates,
             **metric_data
-        }
-
-        return Response(response_data)
+        })
 
 
 class FinancialReportViewSet(BaseFinancialViewSet):

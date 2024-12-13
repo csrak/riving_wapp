@@ -1,315 +1,97 @@
 {% extends "fin_data_cl/base.html" %}
 {% load static %}
 
-{% block title %}Financial Metrics Plotter{% endblock %}
+{% block title %}Financial Metrics Plotter - Finriv{% endblock %}
 
 {% block extra_css %}
-<style>
-    .plot-container {
-        background: white;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-    }
-
-    .controls-container {
-        background: white;
-        border-radius: 0.5rem;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-    }
-
-    .time-range-btn.active {
-        background-color: var(--primary-color) !important;
-        border-color: var(--primary-color) !important;
-    }
-
-    .metric-select {
-        border: 1px solid var(--border-color);
-        border-radius: 0.375rem;
-        padding: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .loading-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255,255,255,0.8);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-        visibility: hidden;
-    }
-
-    .loading-spinner {
-        width: 3rem;
-        height: 3rem;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/metric_plotter.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="controls-container">
-    <div class="row">
-        <div class="col-md-4">
-            <label for="exchange-select" class="form-label">Exchange</label>
-            <select id="exchange-select" class="form-select">
-                <option value="">Select Exchange</option>
-            </select>
-        </div>
-        <div class="col-md-4">
-            <label for="security-select" class="form-label">Security</label>
-            <select id="security-select" class="form-select" disabled>
-                <option value="">Select Security</option>
-            </select>
+<div class="container">
+    <!-- Time range buttons remain the same -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Financial Metrics Plotter</h1>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-primary time-range-btn" data-range="1">1Y</button>
+            <button type="button" class="btn btn-outline-primary time-range-btn" data-range="3">3Y</button>
+            <button type="button" class="btn btn-outline-primary time-range-btn" data-range="5">5Y</button>
+            <button type="button" class="btn btn-outline-primary time-range-btn" data-range="10">10Y</button>
+            <button type="button" class="btn btn-outline-primary time-range-btn active" data-range="max">Max</button>
         </div>
     </div>
 
-    <div class="row mt-4">
-        <div class="col-12">
-            <label class="form-label">Metrics (Select up to 3)</label>
-            <div id="metrics-container">
-                <div class="metric-select">
-                    <select class="form-select metric-dropdown" disabled>
-                        <option value="">Select Metric</option>
-                    </select>
-                </div>
+    <div class="control-panel">
+        <!-- Exchange and Security Selection -->
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="exchange-select" class="form-label">Exchange</label>
+                <select id="exchange-select" class="form-select">
+                    <option value="">Select Exchange</option>
+                </select>
             </div>
-            <button id="add-metric-btn" class="btn btn-outline-primary mt-2" disabled>
-                <i class="bi bi-plus-circle"></i> Add Metric
+            <div class="col-md-6">
+                <label for="security-select" class="form-label">Security</label>
+                <select id="security-select" class="form-select" disabled>
+                    <option value="">Select Security</option>
+                </select>
+            </div>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Metrics Section Header with Dynamic Max -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-0">Metrics</h5>
+                <small class="text-muted">
+                    Select up to <span id="max-metrics-text">...</span> metrics to compare
+                </small>
+            </div>
+            <div class="metric-counter">
+                <span class="badge bg-primary">
+                    <span id="current-metrics">0</span>/<span id="max-metrics">...</span> metrics
+                </span>
+            </div>
+        </div>
+
+        <!-- Metrics Container -->
+        <div id="metrics-container">
+            <!-- Metric rows will be added here dynamically -->
+        </div>
+
+        <!-- Add Metric Button with Dynamic Tooltip -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <button id="add-metric-btn" class="btn btn-outline-primary" disabled>
+                <i class="bi bi-plus-lg"></i> Add Metric
             </button>
+            <small class="text-muted fst-italic">
+                <i class="bi bi-info-circle"></i>
+                Compare up to <span id="max-metrics-help">...</span> metrics on the same graph for better analysis
+            </small>
         </div>
     </div>
 
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="btn-group" role="group" aria-label="Time range">
-                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="1">1Y</button>
-                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="3">3Y</button>
-                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="5">5Y</button>
-                <button type="button" class="btn btn-outline-primary time-range-btn" data-range="10">10Y</button>
-                <button type="button" class="btn btn-outline-primary time-range-btn active" data-range="max">Max</button>
+    <div class="plot-container">
+        <div class="loading-overlay">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <div id="plot-area">
+            <div class="empty-state">
+                <i class="bi bi-graph-up"></i>
+                <p class="mb-0">Select an exchange, security, and metrics to begin plotting</p>
             </div>
         </div>
     </div>
-</div>
-
-<div class="plot-container position-relative">
-    <div class="loading-overlay">
-        <div class="spinner-border text-primary loading-spinner" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-    <div id="metrics-plot"></div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const API_BASE_URL = '{{ api_base_url }}';
-    let currentMetrics = 1;
-    const MAX_METRICS = 3;
-    let plot = null;
-
-    // Utility functions
-    function showLoading() {
-        document.querySelector('.loading-overlay').style.visibility = 'visible';
-    }
-
-    function hideLoading() {
-        document.querySelector('.loading-overlay').style.visibility = 'hidden';
-    }
-
-    function formatDate(date) {
-        return new Date(date).toLocaleDateString();
-    }
-
-    // Initialize exchanges
-    async function loadExchanges() {
-        try {
-            const response = await fetch(`${API_BASE_URL}exchanges/`);
-            const data = await response.json();
-            const select = document.getElementById('exchange-select');
-
-            data.forEach(exchange => {
-                const option = document.createElement('option');
-                option.value = exchange.id;
-                option.textContent = exchange.name;
-                select.appendChild(option);
-            });
-        } catch (error) {
-            handleAjaxError(error);
-        }
-    }
-
-    // Load securities for selected exchange
-    async function loadSecurities(exchangeId) {
-        try {
-            showLoading();
-            const response = await fetch(`${API_BASE_URL}securities/?exchange=${exchangeId}`);
-            const data = await response.json();
-            const select = document.getElementById('security-select');
-
-            select.innerHTML = '<option value="">Select Security</option>';
-            data.forEach(security => {
-                const option = document.createElement('option');
-                option.value = security.id;
-                option.textContent = `${security.symbol} - ${security.name}`;
-                select.appendChild(option);
-            });
-
-            select.disabled = false;
-        } catch (error) {
-            handleAjaxError(error);
-        } finally {
-            hideLoading();
-        }
-    }
-
-    // Load available metrics
-    async function loadMetrics() {
-        try {
-            const response = await fetch(`${API_BASE_URL}financial-data/metrics/`);
-            const data = await response.json();
-            const dropdowns = document.querySelectorAll('.metric-dropdown');
-
-            dropdowns.forEach(dropdown => {
-                dropdown.innerHTML = '<option value="">Select Metric</option>';
-                data.forEach(metric => {
-                    const option = document.createElement('option');
-                    option.value = metric.field;
-                    option.textContent = metric.display_name;
-                    dropdown.appendChild(option);
-                });
-                dropdown.disabled = false;
-            });
-        } catch (error) {
-            handleAjaxError(error);
-        }
-    }
-
-    // Fetch and plot financial data
-    async function updatePlot() {
-        const securityId = document.getElementById('security-select').value;
-        if (!securityId) return;
-
-        const selectedMetrics = Array.from(document.querySelectorAll('.metric-dropdown'))
-            .map(dropdown => dropdown.value)
-            .filter(value => value);
-
-        if (selectedMetrics.length === 0) return;
-
-        const timeRange = document.querySelector('.time-range-btn.active').dataset.range;
-        const today = new Date();
-        let startDate = new Date();
-
-        if (timeRange !== 'max') {
-            startDate.setFullYear(today.getFullYear() - parseInt(timeRange));
-        }
-
-        try {
-            showLoading();
-            const response = await fetch(
-                `${API_BASE_URL}financial-data/?security=${securityId}&metrics=${selectedMetrics.join(',')}&start_date=${startDate.toISOString()}`
-            );
-            const data = await response.json();
-
-            const traces = selectedMetrics.map(metric => ({
-                x: data.dates,
-                y: data[metric],
-                name: document.querySelector(`option[value="${metric}"]`).textContent,
-                type: 'scatter'
-            }));
-
-            const layout = {
-                title: 'Financial Metrics Over Time',
-                xaxis: { title: 'Date' },
-                yaxis: { title: 'Value' },
-                showlegend: true,
-                height: 600
-            };
-
-            Plotly.newPlot('metrics-plot', traces, layout);
-        } catch (error) {
-            handleAjaxError(error);
-        } finally {
-            hideLoading();
-        }
-    }
-
-    // Event Listeners
-    document.getElementById('exchange-select').addEventListener('change', (e) => {
-        if (e.target.value) {
-            loadSecurities(e.target.value);
-        } else {
-            document.getElementById('security-select').disabled = true;
-        }
-    });
-
-    document.getElementById('security-select').addEventListener('change', (e) => {
-        if (e.target.value) {
-            loadMetrics();
-            document.getElementById('add-metric-btn').disabled = false;
-        }
-        updatePlot();
-    });
-
-    document.getElementById('add-metric-btn').addEventListener('click', () => {
-        if (currentMetrics < MAX_METRICS) {
-            const container = document.getElementById('metrics-container');
-            const newMetric = document.createElement('div');
-            newMetric.className = 'metric-select';
-            newMetric.innerHTML = `
-                <div class="d-flex gap-2">
-                    <select class="form-select metric-dropdown">
-                        <option value="">Select Metric</option>
-                    </select>
-                    <button class="btn btn-outline-danger remove-metric-btn">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            `;
-            container.appendChild(newMetric);
-            loadMetrics();
-            currentMetrics++;
-        }
-
-        if (currentMetrics >= MAX_METRICS) {
-            document.getElementById('add-metric-btn').disabled = true;
-        }
-    });
-
-    document.getElementById('metrics-container').addEventListener('click', (e) => {
-        if (e.target.closest('.remove-metric-btn')) {
-            e.target.closest('.metric-select').remove();
-            currentMetrics--;
-            document.getElementById('add-metric-btn').disabled = false;
-            updatePlot();
-        }
-    });
-
-    document.getElementById('metrics-container').addEventListener('change', (e) => {
-        if (e.target.classList.contains('metric-dropdown')) {
-            updatePlot();
-        }
-    });
-
-    document.querySelector('.btn-group').addEventListener('click', (e) => {
-        if (e.target.classList.contains('time-range-btn')) {
-            document.querySelectorAll('.time-range-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            e.target.classList.add('active');
-            updatePlot();
-        }
-    });
-
-    // Initialize
-    loadExchanges();
+    // Pass Django template variables to JavaScript
+    const FINANCIAL_DATA_API = '{{ api_base_url }}financial-data/';
 </script>
+<script src="{% static 'js/metric_plotter.js' %}"></script>
 {% endblock %}

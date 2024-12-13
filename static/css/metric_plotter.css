@@ -1,0 +1,139 @@
+/**
+ * metric_plotter.css
+ * Styles for the Financial Metrics Plotter component
+ */
+
+.control-panel {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    transition: box-shadow 0.3s ease;
+}
+
+.control-panel:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+}
+
+/* Plot container styles */
+.plot-container {
+    background: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    position: relative;
+    min-height: 500px;
+    transition: box-shadow 0.3s ease;
+}
+
+.plot-container:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+}
+
+/* Metric row styles */
+.metric-row {
+    position: relative;
+    margin-bottom: 1rem;
+    transition: opacity 0.3s ease;
+}
+
+.metric-row:last-child {
+    margin-bottom: 0;
+}
+
+.metric-row.removing {
+    opacity: 0;
+}
+
+/* Remove metric button styles */
+.remove-metric {
+    position: absolute;
+    right: -40px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.remove-metric:hover {
+    opacity: 0.9;
+    transform: translateY(-50%) scale(1.05);
+}
+
+/* Time range button styles */
+.time-range-btn {
+    transition: all 0.2s ease;
+}
+
+.time-range-btn.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    border-color: transparent;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Loading overlay styles */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 0.5rem;
+    z-index: 1000;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.visible {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Add metric button styles */
+#add-metric-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#add-metric-btn:hover:not(:disabled) {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+/* Empty state styles */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: var(--text-muted);
+    transition: opacity 0.3s ease;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .remove-metric {
+        position: relative;
+        right: 0;
+        transform: none;
+        top: 0;
+        margin-top: 0.5rem;
+    }
+
+    .metric-row {
+        margin-bottom: 1.5rem;
+    }
+}
