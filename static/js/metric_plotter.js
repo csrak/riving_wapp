@@ -588,3 +588,49 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 });
+  function updatePlotLayout() {
+    const isMobile = window.innerWidth < 768;
+    const plotArea = document.getElementById('plot-area');
+
+    if (window.Plotly && plotArea.data) {
+      const update = {
+        'legend.orientation': isMobile ? 'h' : 'v',
+        'legend.y': isMobile ? -0.5 : 1,
+        'legend.x': isMobile ? 0.5 : 1.02,
+        'legend.xanchor': isMobile ? 'center' : 'left',
+        'legend.yanchor': isMobile ? 'top' : 'auto',
+        'margin.b': isMobile ? 100 : 50,
+        'margin.r': isMobile ? 20 : 100,
+        'xaxis.tickangle': isMobile ? -45 : 0
+      };
+
+      Plotly.relayout(plotArea, update);
+    }
+  }
+
+  // Add resize listener
+  window.addEventListener('resize', () => {
+    clearTimeout(window.resizeTimer);
+    window.resizeTimer = setTimeout(updatePlotLayout, 250);
+  });
+
+  // Modify your existing plot creation code to include this initial setup
+  const defaultLayout = {
+    autosize: true,
+    showlegend: true,
+    hovermode: 'x unified',
+    legend: {
+      bgcolor: 'rgba(255,255,255,0.9)',
+      bordercolor: 'rgba(0,0,0,0.1)',
+      borderwidth: 1
+    },
+    margin: { t: 30 },
+    xaxis: {
+      showgrid: true,
+      gridcolor: 'rgba(0,0,0,0.1)'
+    },
+    yaxis: {
+      showgrid: true,
+      gridcolor: 'rgba(0,0,0,0.1)'
+    }
+  };
