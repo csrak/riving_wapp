@@ -25,6 +25,8 @@
     position: relative;
     min-height: 500px;
     transition: box-shadow 0.3s ease;
+    width: 100%;
+    max-height: 70vh;
 }
 
 .plot-container:hover {
@@ -123,82 +125,3 @@
     opacity: 0.7;
 }
 
-/* Enhanced mobile responsiveness */
-@media (max-width: 768px) {
-    /* Adjust plot container for mobile */
-    .plot-container {
-        min-height: auto;
-        max-height: 80vh;
-        padding: 1rem;
-        margin-bottom: 2rem; /* Extra space for legend */
-    }
-
-    /* Improve control panel spacing */
-    .control-panel {
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    /* Stack time range buttons better */
-    .btn-group {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
-        width: 100%;
-    }
-
-    .time-range-btn {
-        width: 100%;
-        padding: 0.5rem;
-        font-size: 0.875rem;
-    }
-
-    /* Fix remove button positioning */
-    .remove-metric {
-        position: static;
-        margin-left: 0.5rem;
-        transform: none;
-    }
-
-    .metric-row {
-        margin-bottom: 1rem;
-    }
-
-    /* Adjust metric selects for better mobile layout */
-    .metric-row .d-flex {
-        flex-wrap: nowrap;
-    }
-
-    .metric-select {
-        flex: 1;
-        min-width: 0; /* Prevents select from overflowing */
-    }
-
-    /* Ensure headers don't wrap awkwardly */
-    .h3 {
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
-    }
-
-    /* Make labels more compact */
-    .form-label {
-        margin-bottom: 0.25rem;
-    }
-
-    /* Adjust empty state for mobile */
-    .empty-state {
-        min-height: 300px;
-        padding: 1rem;
-    }
-}
-
-/* Additional breakpoint for very small screens */
-@media (max-width: 480px) {
-    .btn-group {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .plot-container {
-        max-height: 70vh;
-    }
-}

@@ -36,7 +36,11 @@ class MetricPlotter {
         ],
 
         // Plot margins
-        MARGINS: { l: 60, r: 30, t: 50, b: 50 }
+        MARGINS: { l: 60, r: 30, t: 50, b: 50 },
+
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false
     };
 
     /**
@@ -433,7 +437,25 @@ class MetricPlotter {
             margin: MetricPlotter.CONFIG.MARGINS,
             hovermode: 'x unified',
             plot_bgcolor: 'white',
-            paper_bgcolor: 'white'
+            paper_bgcolor: 'white',
+            autosize: true,
+            showlegend: true,
+            legend: {
+                orientation: 'h',  // horizontal legend below
+                y: -0.2,          // position below the plot
+                x: 0.5,           // centered
+                xanchor: 'center'
+            },
+            margin: {
+                l: 50, r: 30, t: 30, b: 100  // extra bottom margin for legend
+            },
+            xaxis: {
+                automargin: true,
+                tickangle: -45
+            },
+            yaxis: {
+                automargin: true
+    }
         };
 
         const config = {
