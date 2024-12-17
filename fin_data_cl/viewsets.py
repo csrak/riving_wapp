@@ -313,39 +313,24 @@ class PriceDataViewSet(BaseFinancialViewSet):
             security = Security.objects.get(ticker=ticker)
             queryset = PriceData.objects.filter(security=security)
 
-            # Print the first few records to see what we're working with
-            print(f"First few records: {queryset.values()[:3]}")  # Debug print 2
-
-            latest_date = queryset.order_by('-date').values('date').first()
-            print(f"Latest date: {latest_date}")
-
-            # Get the latest available date using the same logic as get_latest_queryset
+            # Define the latest date and calculate start date
             latest_possible_date = queryset.order_by('-date').values('date').first()['date']
-            print(f"Latest possible date: {latest_possible_date}")
-            # Define acceptable dates (today or yesterday)
-            acceptable_dates = [
-                latest_possible_date,
-                latest_possible_date - timedelta(days=1)
-            ]
+            if not latest_possible_date:
+                return Response({'error': 'No data available'}, status=404)
 
-            # Get the actual latest date with data
-            latest_date = latest_possible_date
-
-            # Calculate the start date based on timeframe
             if timeframe == '1W':
-                start_date = latest_date - timedelta(days=7)
+                start_date = latest_possible_date - timedelta(days=7)
             elif timeframe == '1M':
-                start_date = latest_date - timedelta(days=30)
+                start_date = latest_possible_date - timedelta(days=30)
             elif timeframe == '6M':
-                start_date = latest_date - timedelta(days=180)
+                start_date = latest_possible_date - timedelta(days=180)
             elif timeframe == '1Y':
-                start_date = latest_date - timedelta(days=365)
+                start_date = latest_possible_date - timedelta(days=365)
             elif timeframe == '5Y':
-                start_date = latest_date - timedelta(days=1825)
+                start_date = latest_possible_date - timedelta(days=1825)
             else:  # 'Max'
                 start_date = None
 
-            # Filter data
             if start_date:
                 queryset = queryset.filter(date__gte=start_date)
 
@@ -356,28 +341,39 @@ class PriceDataViewSet(BaseFinancialViewSet):
                     'error': f'No data available for {ticker} in the selected timeframe'
                 }, status=404)
 
-            # Process data with explicit type conversion and None handling
+            # Process and filter invalid data
             data = []
             for record in queryset:
                 try:
-                    data_point = {
+                    open_price = float(record.open_price)
+                    high_price = float(record.high_price)
+                    low_price = float(record.low_price)
+                    close_price = float(record.close_price)
+
+                    # Append only valid data points
+                    data.append({
                         'date': record.date.strftime('%Y-%m-%d'),
-                        'open_price': float(record.open_price if record.open_price is not None else 0),
-                        'high_price': float(record.high_price if record.high_price is not None else 0),
-                        'low_price': float(record.low_price if record.low_price is not None else 0),
-                        'close_price': float(record.close_price if record.close_price is not None else 0),
-                        'volume': int(record.volume if record.volume is not None else 0)
-                    }
-                    data.append(data_point)
-                except (TypeError, ValueError) as e:
-                    logger.warning(f"Error processing record for {ticker} on {record.date}: {e}")
+                        'open_price': open_price,
+                        'high_price': high_price,
+                        'low_price': low_price,
+                        'close_price': close_price,
+                        'volume': int(record.volume) if record.volume else 0
+                    })
+                except (TypeError, ValueError):
+                    # Skip this record if any price value is invalid
+                    logger.warning(f"Skipping invalid data for {ticker} on {record.date}")
                     continue
+
+            if not data:
+                return Response({
+                    'error': f'All data for {ticker} in the selected timeframe is invalid.'
+                }, status=404)
 
             return Response({
                 'data': data,
                 'ticker': ticker,
                 'timeframe': timeframe,
-                'latest_date': latest_date.strftime('%Y-%m-%d')
+                'latest_date': latest_possible_date.strftime('%Y-%m-%d')
             })
 
         except Security.DoesNotExist:

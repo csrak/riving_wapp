@@ -26,13 +26,20 @@ class PriceDataFetcher:
     def __init__(self, exchange: Exchange):
         self.exchange = exchange
 
-    def to_decimal(self, value) -> Optional[Decimal]:
+    def old_decimal(self, value) -> Optional[Decimal]:
         """Convert value to Decimal, handling None and invalid values"""
         try:
             return Decimal(str(value)) if value is not None else None
         except (InvalidOperation, ValueError):
             return None
 
+    def to_decimal(value):
+        if str(value) in [None, 'NaN', 'nan', '']:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return None
     def fetch_data(self, security: Security, use_previous_day: bool = False) -> List[Dict]:
         """
         Fetch price data for a single security starting from the appropriate date

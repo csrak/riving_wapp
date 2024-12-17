@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from finriv.utils.exchanges import ExchangeRegistry
 from django.utils import timezone
-
+from django.db.models import Q
 
 class SecurityManager(Manager):
     def get_queryset(self):
@@ -17,6 +17,19 @@ class PriceDataManager(Manager):
             security=security,
             date__range=[start_date, end_date]
         ).order_by('date')
+    def valid(self):
+        """
+        Return only valid records where price fields are numeric and non-null.
+        """
+        return self.filter(
+            ~Q(open_price=None) & ~Q(high_price=None) & ~Q(low_price=None) & ~Q(close_price=None),
+        ).extra(where=[
+            "CAST(open_price AS REAL) IS NOT NULL",
+            "CAST(high_price AS REAL) IS NOT NULL",
+            "CAST(low_price AS REAL) IS NOT NULL",
+            "CAST(close_price AS REAL) IS NOT NULL"
+        ])
+
 
 class Exchange(models.Model):
     """

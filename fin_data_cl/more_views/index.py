@@ -159,11 +159,14 @@ def index(request):
         if timeframe not in ['D', 'W', 'M']:
             timeframe = 'D'
 
+        # Use only valid price data
+        valid_prices = PriceData.objects.valid()
+
         # Get latest market data
-        latest_data = PriceData.objects.order_by('-date').select_related('security').first()
+        latest_data = valid_prices.order_by('-date').select_related('security').first()
         if not latest_data:
             return render(request, 'fin_data_cl/index.html', {
-                'error': 'No price data available'
+                'error': 'No valid price data available'
             })
 
         # Calculate reference dates for our timeframe
@@ -179,40 +182,40 @@ def index(request):
             period_text = "Monthly"
 
         # Get the most recent trading day not exceeding our target previous date
-        prev_date = (PriceData.objects
-        .filter(date__lte=prev_date)
-        .values('date')
-        .order_by('-date')
-        .first()['date'])
+        prev_date = (valid_prices
+                     .filter(date__lte=prev_date)
+                     .values('date')
+                     .order_by('-date')
+                     .first()['date'])
 
         # Get current and previous prices with price change calculations
-        latest_prices = (PriceData.objects
-        .filter(date=latest_date)
-        .select_related('security')
-        .annotate(
-            previous_close=Subquery(
-                PriceData.objects
-                .filter(
-                    security_id=OuterRef('security_id'),
-                    date=prev_date
-                )
-                .values('close_price')[:1]
-            )
-        )
-        .annotate(
-            price_change=Case(
-                When(
-                    previous_close__isnull=False,
-                    previous_close__gt=0,
-                    then=ExpressionWrapper(
-                        (F('close_price') - F('previous_close')) / F('previous_close') * 100,
-                        output_field=FloatField()
-                    )
-                ),
-                default=Value(0.0),
-                output_field=FloatField(),
-            )
-        ))
+        latest_prices = (valid_prices
+                         .filter(date=latest_date)
+                         .select_related('security')
+                         .annotate(
+                             previous_close=Subquery(
+                                 valid_prices
+                                 .filter(
+                                     security_id=OuterRef('security_id'),
+                                     date=prev_date
+                                 )
+                                 .values('close_price')[:1]
+                             )
+                         )
+                         .annotate(
+                             price_change=Case(
+                                 When(
+                                     previous_close__isnull=False,
+                                     previous_close__gt=0,
+                                     then=ExpressionWrapper(
+                                         (F('close_price') - F('previous_close')) / F('previous_close') * 100,
+                                         output_field=FloatField()
+                                     )
+                                 ),
+                                 default=Value(0.0),
+                                 output_field=FloatField(),
+                             )
+                         ))
 
         # Calculate market breadth statistics
         market_stats = latest_prices.aggregate(
@@ -254,7 +257,7 @@ def index(request):
         # Standard analysis tools definition
         analysis_tools = [
             {
-                'name': 'Metric Ploter',
+                'name': 'Metric Plotter',
                 'description': 'Plot and compare key metrics',
                 'url': f"/metric_plotter/"
             },
