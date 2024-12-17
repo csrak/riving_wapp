@@ -22,7 +22,10 @@ You can view the production version here:
 
 ## About
 
-The main idea behind Riving WebApp is to provide **easy-to-use access** and **visualizations** of the data aggregated by Riving Tools.  
+The main idea behind Riving WebApp is to provide **easy-to-use access** and **visualizations** of the data aggregated by Riving Tools. 
+
+Riving tools scraps data from official sources in the Chilean market, but that are often wrongly interpreted or missing data in some of the biggest financial data aggregators duch as Bloomberg.
+
 Most tools are being integrated into the web app, enabling:  
 - **Self-updating databases**  
 - **Standalone functionality**  
