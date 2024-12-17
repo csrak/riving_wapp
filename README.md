@@ -38,7 +38,7 @@ Most tools are being integrated into the web app, enabling:
 - Scraped and processed from **Chilean CMF XBRL files**.  
 - Follows **IFRS accounting standards**.
 
-### 2. Yearly Detailed Reports
+### 2. Quarterly Detailed Reports
 - Text-based reports sourced from the **CMF**.
 
 ### 3. Dividend Data
