@@ -393,16 +393,7 @@ def generic_data_view(request, template_name):
 
         if settings.DEBUG:
             # In development, show detailed error
-            return render(
-                request,
-                'debug/template_not_found.html',
-                {
-                    **context,
-                    'template_name': template_name,
-                    'available_templates': _get_available_templates(),
-                },
-                status=404
-            )
+            return render(request, f'{template_name}.html', context)
         else:
             # In production, show generic "In Construction" page
             return render(request, 'errors/in_construction.html', context, status=404)

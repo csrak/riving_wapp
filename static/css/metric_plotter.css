@@ -27,6 +27,7 @@
     transition: box-shadow 0.3s ease;
     width: 100%;
     max-height: 70vh;
+    overflow: hidden;
 }
 
 .plot-container:hover {
