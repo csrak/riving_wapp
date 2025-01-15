@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import, unicode_literals
 import os
-from celery_app import Celery
+from celery import Celery
 from django.conf import settings
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'finriv.settings.development')
