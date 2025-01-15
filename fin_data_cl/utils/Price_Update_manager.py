@@ -32,7 +32,7 @@ class PriceDataFetcher:
             return Decimal(str(value)) if value is not None else None
         except (InvalidOperation, ValueError):
             return None
-
+    @staticmethod
     def to_decimal(value):
         if str(value) in [None, 'NaN', 'nan', '']:
             return None
@@ -72,12 +72,12 @@ class PriceDataFetcher:
                 start=start_date,
                 end=end_date + timedelta(days=1)  # Include end_date
             )
+            #print(stock.info.get('marketCap'))
 
             # Rest of the method remains unchanged
             if hist.empty:
                 logger.warning(f"No new data returned for {full_symbol}")
                 return []
-
             try:
                 market_cap = self.to_decimal(stock.info.get('marketCap'))
             except Exception:
