@@ -27,7 +27,7 @@ for prefix, config in VIEWSET_MAPPING.items():
 # Generate URL patterns for templates
 template_patterns = [
     path(f"{template}/",
-         parent_views.generic_data_view,
+         views.generic_data_view,
          {'template_name': template},
          name=template)
     for config in VIEWSET_MAPPING.values()

@@ -9,87 +9,48 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Max, Q, DecimalField
-
+from rest_framework.permissions import AllowAny # WHAT IS THIS
+from rest_framework.parsers import JSONParser
 
 class PortfolioViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for portfolio management operations.
-    Handles portfolio creation, updates, and analysis.
-    """
+    """ViewSet for portfolio management operations."""
     serializer_class = PortfolioSerializer
-    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [AllowAny]  # Adjust according to your needs
+    parser_classes = [JSONParser]  # Add this line to explicitly accept JSON
 
     def get_queryset(self):
-        """Filter portfolios by session key or user"""
+        """Filter portfolios by session key or user."""
         queryset = Portfolio.objects.all()
-
         if self.request.user.is_authenticated:
-            # Show user's portfolios and public portfolios
-            return queryset.filter(
-                Q(user=self.request.user) | Q(is_public=True)
+            return queryset.filter(user=self.request.user)
+        return queryset.filter(session_key=self.request.session.session_key)
+
+    def create(self, request, *args, **kwargs):
+        """Create a new portfolio with securities."""
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+                headers=headers
             )
-        return queryset.filter(
-            Q(session_key=self.request.session.session_key) | Q(is_public=True)
-        )
+        except Exception as e:
+            return Response(
+                {'message': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     def perform_create(self, serializer):
-        """Associate portfolio with session or user"""
+        """Associate portfolio with session or user."""
         if self.request.user.is_authenticated:
             serializer.save(user=self.request.user)
         else:
             if not self.request.session.session_key:
                 self.request.session.save()
             serializer.save(session_key=self.request.session.session_key)
-
-    @action(detail=False, methods=['post'])
-    def upload_tickers(self, request):
-        """Handle ticker file upload for portfolio creation"""
-        if 'file' not in request.FILES:
-            return Response(
-                {'error': 'No file provided'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        file = request.FILES['file']
-        if not file.name.endswith('.txt'):
-            return Response(
-                {'error': 'Only .txt files are supported'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            content = file.read().decode('utf-8')
-            tickers = [line.strip() for line in content.splitlines() if line.strip()]
-        except UnicodeDecodeError:
-            return Response(
-                {'error': 'Invalid file encoding'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        existing_securities = Security.objects.filter(ticker__in=tickers)
-        found_tickers = existing_securities.values_list('ticker', flat=True)
-        not_found = set(tickers) - set(found_tickers)
-
-        return Response({
-            'securities': SecuritySerializer(existing_securities, many=True).data,
-            'not_found': list(not_found)
-        })
-
-    @action(detail=True)
-    def calculate_metrics(self, request, pk=None):
-        """Calculate portfolio metrics"""
-        portfolio = self.get_object()
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-
-        try:
-            metrics = portfolio.calculate_metrics(start_date, end_date)
-            return Response(metrics)
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
 
 class OptimizationViewSet(viewsets.ModelViewSet):
