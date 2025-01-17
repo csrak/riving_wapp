@@ -1,0 +1,300 @@
+{% extends "fin_data_cl/base.html" %}
+
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Portfolio Creation Form -->
+    <div class="mb-8 bg-white p-6 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4">Create Portfolio</h2>
+        <form id="portfolioForm" class="space-y-4">
+            <div>
+                <label for="portfolioName" class="block text-sm font-medium text-gray-700">Portfolio Name</label>
+                <input type="text" id="portfolioName" name="name" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <div>
+                <label for="portfolioDescription" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                <textarea id="portfolioDescription" name="description"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Public Portfolio</label>
+                <input type="checkbox" id="isPublic" name="is_public" class="mt-1">
+            </div>
+        </form>
+    </div>
+
+    <!-- Securities Selection -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Exchange and Security Selection -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-xl font-bold mb-4">Add Securities</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="exchangeSelect" class="block text-sm font-medium text-gray-700">Select Exchange</label>
+                    <select id="exchangeSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">Select an exchange...</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="securitySelect" class="block text-sm font-medium text-gray-700">Select Security</label>
+                    <select id="securitySelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" disabled>
+                        <option value="">Select a security...</option>
+                    </select>
+                </div>
+                <button id="addSecurity" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600" disabled>
+                    Add Security
+                </button>
+            </div>
+        </div>
+
+        <!-- File Upload -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-xl font-bold mb-4">Upload Tickers</h3>
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label for="tickerFile" class="block text-sm font-medium text-gray-700">Upload .txt file</label>
+                    <input type="file" id="tickerFile" accept=".txt"
+                        class="mt-1 block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100">
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                    Upload
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Selected Securities Table -->
+    <div class="mt-8 bg-white p-6 rounded-lg shadow">
+        <h3 class="text-xl font-bold mb-4">Selected Securities</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticker</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exchange</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="selectedSecurities" class="bg-white divide-y divide-gray-200">
+                    <!-- Securities will be added here dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Portfolio Button -->
+    <div class="mt-8 flex justify-end">
+        <button id="createPortfolio" class="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600">
+            Create Portfolio
+        </button>
+    </div>
+</div>
+
+<!-- Add this at the end of your template -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // State management
+    let selectedSecurities = new Map();
+
+    // Initialize by loading exchanges
+    fetch('/api/v1/price-data/available_exchanges/')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('exchangeSelect');
+            data.exchanges.forEach(exchange => {
+                const option = new Option(exchange.name, exchange.id);
+                select.add(option);
+            });
+        });
+
+    // Handle exchange selection
+    document.getElementById('exchangeSelect').addEventListener('change', function(e) {
+        const exchangeId = e.target.value;
+        const securitySelect = document.getElementById('securitySelect');
+        const addButton = document.getElementById('addSecurity');
+
+        securitySelect.disabled = !exchangeId;
+        addButton.disabled = true;
+
+        if (exchangeId) {
+            fetch(`/api/v1/price-data/securities_by_exchange/?exchange_id=${exchangeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    securitySelect.innerHTML = '<option value="">Select a security...</option>';
+                    data.securities.forEach(security => {
+                        if (!selectedSecurities.has(security.id)) {
+                            const option = new Option(`${security.ticker} - ${security.name}`, security.id);
+                            securitySelect.add(option);
+                        }
+                    });
+                });
+        }
+    });
+
+    // Handle security selection
+    document.getElementById('securitySelect').addEventListener('change', function(e) {
+        document.getElementById('addSecurity').disabled = !e.target.value;
+    });
+
+    // Handle adding security
+    document.getElementById('addSecurity').addEventListener('click', function() {
+        const securitySelect = document.getElementById('securitySelect');
+        const security = securitySelect.options[securitySelect.selectedIndex];
+        const [ticker, name] = security.text.split(' - ');
+        const exchangeSelect = document.getElementById('exchangeSelect');
+        const exchange = exchangeSelect.options[exchangeSelect.selectedIndex].text;
+
+        if (!selectedSecurities.has(security.value)) {
+            selectedSecurities.set(security.value, {
+                ticker,
+                name,
+                exchange,
+                weight: (100 / (selectedSecurities.size + 1)).toFixed(2)
+            });
+
+            updateSecuritiesTable();
+            securitySelect.remove(securitySelect.selectedIndex);
+            document.getElementById('addSecurity').disabled = true;
+        }
+    });
+
+    // Handle file upload
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        const fileInput = document.getElementById('tickerFile');
+        formData.append('file', fileInput.files[0]);
+
+        fetch('/api/v1/portfolios/upload_tickers/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            data.securities.forEach(security => {
+                if (!selectedSecurities.has(security.id)) {
+                    selectedSecurities.set(security.id, {
+                        ticker: security.ticker,
+                        name: security.name,
+                        exchange: security.exchange.name,
+                        weight: (100 / (selectedSecurities.size + 1)).toFixed(2)
+                    });
+                }
+            });
+            updateSecuritiesTable();
+            if (data.not_found.length > 0) {
+                alert(`Securities not found: ${data.not_found.join(', ')}`);
+            }
+        });
+    });
+
+    // Handle creating portfolio
+    document.getElementById('createPortfolio').addEventListener('click', function() {
+        const name = document.getElementById('portfolioName').value;
+        const description = document.getElementById('portfolioDescription').value;
+        const isPublic = document.getElementById('isPublic').checked;
+
+        if (!name) {
+            alert('Please enter a portfolio name');
+            return;
+        }
+
+        if (selectedSecurities.size === 0) {
+            alert('Please add at least one security');
+            return;
+        }
+
+        const data = {
+            name,
+            description,
+            is_public: isPublic,
+            security_ids: Array.from(selectedSecurities.keys())
+        };
+
+        fetch('/api/v1/portfolios/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert('Portfolio created successfully!');
+            window.location.href = `/portfolios/${data.id}/`;
+        })
+        .catch(error => {
+            alert('Error creating portfolio');
+            console.error('Error:', error);
+        });
+    });
+
+    // Helper function to update securities table
+    function updateSecuritiesTable() {
+        const tbody = document.getElementById('selectedSecurities');
+        tbody.innerHTML = '';
+
+        selectedSecurities.forEach((security, id) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">${security.ticker}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${security.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${security.exchange}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="number" value="${security.weight}" min="0" max="100" step="0.01"
+                        class="w-20 rounded border-gray-300"
+                        onchange="updateWeight('${id}', this.value)">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <button onclick="removeSecurity('${id}')"
+                        class="text-red-600 hover:text-red-900">Remove</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Add these functions to window object so they can be called from inline handlers
+    window.updateWeight = function(id, weight) {
+        const security = selectedSecurities.get(id);
+        if (security) {
+            security.weight = parseFloat(weight);
+        }
+    };
+
+    window.removeSecurity = function(id) {
+        selectedSecurities.delete(id);
+        updateSecuritiesTable();
+        // Trigger exchange change to refresh available securities
+        const event = new Event('change');
+        document.getElementById('exchangeSelect').dispatchEvent(event);
+    };
+});
+</script>
+{% endblock %}

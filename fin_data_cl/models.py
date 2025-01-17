@@ -6,6 +6,7 @@ from finriv.utils.exchanges import ExchangeRegistry
 from django.utils import timezone
 from django.db.models import Q
 
+
 class SecurityManager(Manager):
     def get_queryset(self):
         return super().get_queryset().select_related('exchange')
@@ -17,6 +18,7 @@ class PriceDataManager(Manager):
             security=security,
             date__range=[start_date, end_date]
         ).order_by('date')
+
     def valid(self):
         """
         Return only valid records where price fields are numeric and non-null.
@@ -149,7 +151,7 @@ class BaseFinancialData(models.Model):
     Using explicit timestamp fields instead of auto_now for better control
     """
     security = models.ForeignKey(
-        'Security',  # Using string to avoid circular imports
+        'fin_data_cl.Security',  # Using string to avoid circular imports
         on_delete=models.CASCADE,
         related_name='%(class)s_data',  # This creates unique related names for each child class
         null=True,

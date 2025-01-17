@@ -23,6 +23,7 @@ urlpatterns = [
     path('', include('fin_data_cl.urls')),
     #path('api/v1/', include('fin_data_cl.api_urls', namespace='api')),
     path('', include('price_plots.urls')),
+    path('portfolios/', include('portfolios.urls')),
     #path('plots/', include('price_plots.urls', namespace='plots')),
     path('metrics/', include('metrics_an.urls', namespace='metrics')),
     path('about/', views.about, name='about'),

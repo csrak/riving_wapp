@@ -12,6 +12,7 @@ INSTALLED_APPS = [
     'price_plots',
     'fin_data_cl',
     'django_q',
+    'portfolios',
     'metrics_an',
     "django.contrib.admin",
     "django.contrib.auth",
