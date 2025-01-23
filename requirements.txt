@@ -1,7 +1,6 @@
 Django==4.1
 fitz==0.0.1.dev2
 llama_index==0.12.1
-lxml==4.9.1
 Markdown==3.4.4
 numpy==1.23.1
 openai==1.55.1
