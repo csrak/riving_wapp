@@ -108,3 +108,5 @@ REST_FRAMEWORK = {
 API_BASE_URL = '/api/v1/' #To save time writign api calls
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
