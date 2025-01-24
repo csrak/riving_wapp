@@ -320,13 +320,13 @@ class MetricPlotter {
         row.className = 'metric-row';
         row.innerHTML = `
             <div class="d-flex align-items-center gap-2">
-                <select class="form-select metric-select">
+                <select class="form-select metric-select" style="min-width: 0">
                     <option value="">Select Metric</option>
                     ${metrics.map(metric =>
                         `<option value="${metric.field}">${metric.display_name}</option>`
                     ).join('')}
                 </select>
-                <button class="btn btn-outline-danger remove-metric">
+                <button class="btn btn-outline-danger remove-metric" style="min-width: 0">
                     <i class="bi bi-trash"></i>
                 </button>
             </div>
