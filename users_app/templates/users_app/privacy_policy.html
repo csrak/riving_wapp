@@ -1,0 +1,60 @@
+{% extends 'fin_data_cl/base.html' %}
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-4">Privacy Policy</h1>
+        <p class="text-gray-600 mb-8">Last updated: {% now "F j, Y" %}</p>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">1. Data We Collect</h2>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Username (required)</li>
+                <li>Email address (required)</li>
+                <li>Phone number (optional)</li>
+                <li>User-generated content (stock baskets, watchlists)</li>
+            </ul>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">2. How We Use Your Data</h2>
+            <p class="mb-4">We use your data for:</p>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Account management and authentication</li>
+                <li>Providing access to financial information services</li>
+                <li>Managing your stock baskets and watchlists</li>
+                <li>Technical support and security</li>
+            </ul>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">3. Your Rights</h2>
+            <p class="mb-4">Under GDPR, you have rights to:</p>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Access your personal data</li>
+                <li>Request data correction or deletion</li>
+                <li>Object to data processing</li>
+                <li>Request data portability</li>
+                <li>Withdraw consent</li>
+            </ul>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">4. Data Security</h2>
+            <p>We implement appropriate technical measures to protect your personal data against unauthorized access or disclosure.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">5. Data Retention</h2>
+            <p>We retain your data only as long as necessary for service provision or legal compliance. Upon account deletion, we remove or anonymize your data within 30 days.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">6. Contact</h2>
+            <p>For privacy-related questions or to exercise your rights, contact us at:</p>
+            <p class="mt-2">
+                <a href="mailto:finriv.app@gmail.com" class="text-blue-600 hover:underline">finriv.app@gmail.com</a>
+            </p>
+        </section>
+    </div>
+</div>
+{% endblock %}

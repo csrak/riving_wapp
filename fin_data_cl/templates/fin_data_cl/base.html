@@ -161,6 +161,24 @@
 
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto gap-2">
+                        {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'users:logout' %}">
+                            <i class="bi bi-box-arrow-right me-1"></i> Logout
+                        </a>
+                    </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'users:login' %}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'users:signup' %}">
+                                <i class="bi bi-person-plus me-1"></i> Sign Up
+                            </a>
+                        </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'metrics:metric_plotter' %}active{% endif %}"
                            href="{% url 'fin_data:metric_plotter' %}">
@@ -220,21 +238,23 @@
         </div>
     </main>
 
-    <footer>
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-6 text-center text-md-start">
-                    <p class="mb-0">&copy; {% now "Y" %} Finriv. All rights reserved.</p>
-                </div>
-                <div class="col-md-6 text-center text-md-end">
-                    <p class="mb-0">
-                        <a href="{% url 'about' %}" class="text-decoration-none text-muted me-3">About</a>
-                        <a href="{% url 'contact' %}" class="text-decoration-none text-muted">Contact</a>
-                    </p>
-                </div>
+<footer>
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6 text-center text-md-start">
+                <p class="mb-0">&copy; {% now "Y" %} Finriv. All rights reserved.</p>
+            </div>
+            <div class="col-md-6 text-center text-md-end">
+                <p class="mb-0">
+                    <a href="{% url 'about' %}" class="text-decoration-none text-muted me-3">About</a>
+                    <a href="{% url 'contact' %}" class="text-decoration-none text-muted me-3">Contact</a>
+                    <a href="{% url 'users:privacy' %}" class="text-decoration-none text-muted me-3">Privacy</a>
+                    <a href="{% url 'users:terms' %}" class="text-decoration-none text-muted">Terms</a>
+                </p>
             </div>
         </div>
-    </footer>
+    </div>
+</footer>
 
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -263,4 +283,5 @@
 
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>

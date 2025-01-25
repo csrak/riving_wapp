@@ -1,0 +1,91 @@
+{% extends 'fin_data_cl/base.html' %}
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-4">Terms and Conditions</h1>
+        <p class="text-gray-600 mb-8">Last updated: {% now "F j, Y" %}</p>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">1. Agreement to Terms</h2>
+            <p class="mb-4">By accessing our website, you agree to these Terms and Conditions. If you disagree, please discontinue use of our services.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">2. Service Access Levels</h2>
+            <div class="space-y-4">
+                <h3 class="text-xl font-medium">2.1 Public Access</h3>
+                <p>Certain features are available without registration, including basic market information.</p>
+
+                <h3 class="text-xl font-medium">2.2 Registered Users</h3>
+                <p>Registration enables additional features like creating and saving stock baskets.</p>
+
+                <h3 class="text-xl font-medium">2.3 Professional Plan</h3>
+                <p>Premium features available to professional users subject to additional terms and fees.</p>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">3. User Accounts</h2>
+            <p>You must maintain accurate information and secure your account credentials. You're responsible for all account activity.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">4. Financial Information Disclaimer</h2>
+            <p>Information provided is for reference only. We don't provide financial advice. Verify all information independently.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">5. Professional Plan Terms</h2>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Subscription fees are charged in advance</li>
+                <li>Cancellation available through account settings</li>
+                <li>No refunds for partial billing periods</li>
+            </ul>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">6. Intellectual Property</h2>
+            <p>All content and features are our exclusive property. User-generated content remains your property.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">7. Prohibited Uses</h2>
+            <p>Users may not:</p>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Scrape or automatically collect data</li>
+                <li>Share account access</li>
+                <li>Use for illegal purposes</li>
+                <li>Attempt to breach security</li>
+            </ul>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">8. Limitation of Liability</h2>
+            <p>We're not liable for investment decisions made using our platform. Service provided "as is" without warranties.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">9. Termination</h2>
+            <p>We may terminate accounts for violations. Users may terminate their accounts at any time.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">10. Governing Law</h2>
+            <p>These terms are governed by EU law. Disputes subject to exclusive jurisdiction of EU courts.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">11. Changes to Terms</h2>
+            <p>We may modify these terms. Continued use after changes constitutes acceptance.</p>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">12. Contact</h2>
+            <p>Questions about these terms:</p>
+            <p class="mt-2">
+                <a href="mailto:finriv.app@gmail.com" class="text-blue-600 hover:underline">finriv.app@gmail.com</a>
+            </p>
+        </section>
+    </div>
+</div>
+{% endblock %}

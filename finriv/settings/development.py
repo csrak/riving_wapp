@@ -30,6 +30,8 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Prints emails to console
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

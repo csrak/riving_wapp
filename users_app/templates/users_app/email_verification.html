@@ -1,0 +1,10 @@
+<!-- users_app/templates/users_app/email_verification.html -->
+{% autoescape off %}
+Hi {{ user.username }},
+
+Please click the link below to verify your email:
+
+http://{{ domain }}{% url 'users:activate' uidb64=uid token=token %}
+
+If you didn't register on our site, please ignore this email.
+{% endautoescape %}
