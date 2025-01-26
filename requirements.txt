@@ -30,7 +30,5 @@ pytz
 celery>=5.2,<6.0
 whitenoise==6.5.0
 django-widget-tweaks==1.5.0
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
+sendgrid
+django-ratelimit>=4.0

@@ -1,5 +1,7 @@
 from .base import *
 from datetime import timedelta
+from decouple import config
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-q(f&!^own^%p_a2_gt)ekepz$jj(axiv*3ba8@cwz2^p*0$a1o"
 
@@ -29,8 +31,10 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': timedelta(days=1),
     },
 }
+ALLOWED_HOSTS = ['127.0.0.1']
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Prints emails to console
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+SENDGRID_API_KEY = config('SENDGRID_KEY', default=None)
 
 LOGGING = {
     'version': 1,
