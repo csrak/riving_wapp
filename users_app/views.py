@@ -90,7 +90,12 @@ def activate_account(request, uidb64, token):
         uid = force_str(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
 
+        # Add debug prints
+        print(f"Attempting to activate user: {user.username}")
+        print(f"Token valid: {email_confirmation_token.check_token(user, token)}")
+
         if not email_confirmation_token.check_token(user, token):
+            print("Token validation failed")  # Debug print
             messages.error(request, 'Activation link is invalid or expired.')
             return redirect('users:login')
 
@@ -102,8 +107,8 @@ def activate_account(request, uidb64, token):
             profile.save()
             messages.success(request, 'Email verified successfully!')
 
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist, ValidationError) as e:
-        logger.error(f"Account activation error: {str(e)}")
+    except Exception as e:
+        print(f"Activation error: {str(e)}")  # Debug print
         messages.error(request, 'Activation link is invalid.')
 
     return redirect('users:login')
