@@ -1,85 +1,105 @@
-from django.shortcuts import render
+# portfolios/views.py
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import Portfolio, Position
+from .serializers import PortfolioSerializer, PositionSerializer
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+import json
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import TemplateView
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Portfolio
+from .serializers import PortfolioSerializer
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
 
-# Create your views here.
-from django.shortcuts import render
-from django.template.exceptions import TemplateDoesNotExist
-from django.conf import settings
-import logging
-logger = logging.getLogger(__name__)
 
-def generic_data_view(request, template_name):
-    """
-    Generic view for serving templates with environment-aware error handling.
-    Production environments will show user-friendly error pages while
-    development environments will show detailed debug information.
-    """
-    context = {
-        'api_base_url': '/api/v1/',
-        'debug': settings.DEBUG,
-    }
+class PortfolioManagementView(LoginRequiredMixin, TemplateView):
+    template_name = 'portfolios/management.html'
 
+
+class PortfolioViewSet(viewsets.ModelViewSet):
+    serializer_class = PortfolioSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Portfolio.objects.filter(user=self.request.user)
+
+    @transaction.atomic
+    @action(detail=True, methods=['post'])
+    def add_position(self, request, pk=None):
+        portfolio = self.get_object()
+        serializer = PositionSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(portfolio=portfolio)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def performance(self, request, pk=None):
+        portfolio = self.get_object()
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        performance_data = portfolio.get_historical_performance(start_date, end_date)
+        return Response(performance_data)
+
+@login_required
+@require_http_methods(["POST"])
+def create_portfolio(request):
     try:
-        return render(request, f'{template_name}.html', context)
-
-    except TemplateDoesNotExist:
-        # Log the error
-        logger.warning(
-            f"Template '{template_name}.html' not found. "
-            f"Requested by user: {request.user}, "
-            f"IP: {request.META.get('REMOTE_ADDR')}"
+        data = json.loads(request.body)
+        portfolio = Portfolio.objects.create(
+            user=request.user,
+            name=data.get('name'),
+            description=data.get('description', ''),
+            is_public=data.get('is_public', False)
         )
-
-        if settings.DEBUG:
-            # In development, show detailed error
-            return render(request, f'{template_name}.html', context)
-        else:
-            # In production, show generic "In Construction" page
-            return render(request, 'errors/in_construction.html', context, status=404)
-
+        return JsonResponse({
+            'id': portfolio.id,
+            'name': portfolio.name,
+            'description': portfolio.description
+        })
     except Exception as e:
-        # Log the error with full traceback
-        logger.error(
-            f"Error rendering template '{template_name}.html'",
-            exc_info=True,
-            extra={
-                'request': request,
-                'template': template_name,
-            }
+        return JsonResponse({'error': str(e)}, status=400)
+
+# portfolios/views.py
+class PortfolioViewSet(viewsets.ModelViewSet):
+    serializer_class = PortfolioSerializer
+    #permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Portfolio.objects.filter(user=self.request.user).order_by('id')
+
+    @action(detail=True, methods=['post'])
+    def add_position(self, request, pk=None):
+        portfolio = self.get_object()
+        security_id = request.data.get('security_id')
+        shares = request.data.get('shares')
+        average_price = request.data.get('average_price')
+
+        position = Position.objects.create(
+            portfolio=portfolio,
+            security_id=security_id,
+            shares=shares,
+            average_price=average_price
         )
 
-        if settings.DEBUG:
-            # Re-raise the exception in development for full traceback
-            raise
-        else:
-            # In production, show generic error page
-            return render(
-                request,
-                'errors/500.html',
-                context,
-                status=500
-            )
+        return Response(PositionSerializer(position).data)
 
+    @action(detail=True, methods=['post'])
+    def update_position(self, request, pk=None):
+        position_id = request.data.get('position_id')
+        position = Position.objects.get(id=position_id, portfolio__user=request.user)
+        position.shares = request.data.get('shares', position.shares)
+        position.average_price = request.data.get('average_price', position.average_price)
+        position.save()
 
-def _get_available_templates():
-    """
-    Helper function to list available templates for debug view.
-    Only called in development when a template is not found.
-    """
-    from django.template.loader import get_template
-    from django.template.loaders.app_directories import get_app_template_dirs
-    import os
-
-    template_dirs = get_app_template_dirs('templates')
-    available_templates = []
-
-    for template_dir in template_dirs:
-        for root, _, files in os.walk(template_dir):
-            for file in files:
-                if file.endswith('.html'):
-                    template_path = os.path.join(
-                        root.replace(str(template_dir), '').lstrip('/'),
-                        file
-                    )
-                    available_templates.append(template_path)
-
-    return sorted(available_templates)
+        return Response(PositionSerializer(position).data)
