@@ -1,0 +1,87 @@
+{% extends 'fin_data_cl/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Stock Selection Section -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Add Stocks</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Exchange</label>
+                        <select id="exchangeSelect" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Search Stocks</label>
+                        <input type="text" id="stockSearch" class="form-control" placeholder="Search...">
+                    </div>
+                    <div id="stockList" class="list-group mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Management Section -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Portfolio Management</h5>
+                    <button class="btn btn-primary" id="newPortfolioBtn">New Portfolio</button>
+                </div>
+                <div class="card-body">
+                    <select id="portfolioSelect" class="form-control mb-3"></select>
+                    <div id="portfolioDetails">
+                        <table class="table" id="positionsTable">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Shares</th>
+                                    <th>Avg Price</th>
+                                    <th>Current Value</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Portfolio Modal -->
+<div class="modal" id="portfolioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Portfolio</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="portfolioForm">
+                    <div class="form-group">
+                        <label>Portfolio Name</label>
+                        <input type="text" class="form-control" id="portfolioName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" id="portfolioDescription"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="savePortfolio">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/portfolio/management.js' %}"></script>
+{% endblock %}

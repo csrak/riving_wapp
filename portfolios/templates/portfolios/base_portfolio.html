@@ -1,0 +1,18 @@
+<!-- portfolios/templates/portfolios/base_portfolio.html -->
+{% extends 'fin_data_cl/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav class="nav nav-tabs mb-4">
+        <a class="nav-link {% if request.resolver_match.url_name == 'management' %}active{% endif %}"
+           href="{% url 'portfolios:management' %}">Portfolio Management</a>
+        <a class="nav-link {% if request.resolver_match.url_name == 'benchmarks' %}active{% endif %}"
+           href="{% url 'portfolios:benchmarks' %}">Benchmarks & Plots</a>
+        <a class="nav-link {% if request.resolver_match.url_name == 'analysis' %}active{% endif %}"
+           href="{% url 'portfolios:analysis' %}">Analysis & Optimization</a>
+    </nav>
+
+    {% block portfolio_content %}
+    {% endblock %}
+</div>
+{% endblock %}
