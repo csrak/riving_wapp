@@ -1,8 +1,8 @@
+# portfolios/models.py
 from django.db import models
 from django.contrib.auth.models import User
 from fin_data_cl.models import Security
 from decimal import Decimal
-import json
 
 
 class Portfolio(models.Model):
@@ -13,51 +13,64 @@ class Portfolio(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Fields for optimization and analysis
-    target_risk = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    target_return = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    optimization_constraints = models.JSONField(default=dict, blank=True)
-    rebalancing_frequency = models.CharField(max_length=20, choices=[
-        ('daily', 'Daily'),
-        ('weekly', 'Weekly'),
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('yearly', 'Yearly'),
-    ], default='monthly')
-
-    def get_historical_performance(self, start_date, end_date):
-        return PortfolioSnapshot.objects.filter(
-            portfolio=self,
-            date__range=(start_date, end_date)
-        ).order_by('date')
+    # Analysis fields
+    target_risk = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True
+    )
+    target_return = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True
+    )
+    rebalancing_frequency = models.CharField(
+        max_length=20,
+        choices=[
+            ('daily', 'Daily'),
+            ('weekly', 'Weekly'),
+            ('monthly', 'Monthly'),
+            ('quarterly', 'Quarterly'),
+            ('yearly', 'Yearly'),
+        ],
+        default='monthly'
+    )
 
     def get_total_value(self):
+        """Calculate total portfolio value"""
         return sum(position.get_current_value() for position in self.positions.all())
 
-    def get_position_weights(self):
-        total_value = self.get_total_value()
-        return {
-            position.security.ticker: (position.get_current_value() / total_value)
-            for position in self.positions.all()
-        } if total_value else {}
-
+    def get_positions_data(self):
+        """Get formatted positions data"""
+        return [{
+            'id': position.id,
+            'security': {
+                'id': position.security.id,
+                'ticker': position.security.ticker,
+                'name': position.security.name
+            },
+            'shares': float(position.shares),
+            'average_price': float(position.average_price),
+            'current_value': float(position.get_current_value())
+        } for position in self.positions.all()]
 
 
 class Position(models.Model):
-    portfolio = models.ForeignKey(Portfolio, related_name='positions', on_delete=models.CASCADE)
+    portfolio = models.ForeignKey(
+        Portfolio,
+        related_name='positions',
+        on_delete=models.CASCADE
+    )
     security = models.ForeignKey(Security, on_delete=models.CASCADE)
     shares = models.DecimalField(max_digits=15, decimal_places=2)
     average_price = models.DecimalField(max_digits=15, decimal_places=2)
     date_added = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
 
-    # Fields for optimization and analysis
-    target_weight = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    minimum_weight = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    maximum_weight = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    sector = models.CharField(max_length=100, blank=True)
-    asset_class = models.CharField(max_length=100, blank=True)
     def get_current_value(self):
+        """Calculate current position value"""
         return self.shares * self.security.get_latest_price()
 
 

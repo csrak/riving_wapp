@@ -1,11 +1,81 @@
 # more_views/index.py
 from django.shortcuts import render
 from django.db.models import F, ExpressionWrapper, FloatField, Count, Case, When, Value
-from django.utils import timezone
 from datetime import timedelta
 from fin_data_cl.models import PriceData, Security
 from django.conf import settings
 from django.db.models import Subquery, OuterRef
+from django.core.cache import cache
+from functools import lru_cache
+@lru_cache(maxsize=1)
+def get_analysis_tools():
+    return [
+        {
+            'name': 'Metric Plotter',
+            'description': 'Plot and compare key metrics',
+            'url': f"/metric_plotter/"
+        },
+        {
+            'name': 'Stock Screener',
+            'description': 'Filter stocks by key metrics',
+            'url': '/screener/'
+        },
+        {
+            'name': 'Financial Reports & Statements',
+            'description': 'Compare AI Summarized Reports for Companies and Quarters',
+            'url': f"/reports/"
+        },
+        {
+            'name': 'Financial Risks',
+            'description': 'Compare AI Summarized Risks and historical changes from Companies Reports',
+            'url': f"/risks/"
+        }
+    ]
+
+
+def get_cached_price_data(date, timeframe):
+    """Cache price data for frequently accessed dates and timeframes."""
+    cache_key = f'price_data_{date.isoformat()}_{timeframe}'
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return cached_data
+
+    previous_date = get_previous_date(date, timeframe)
+
+    # Optimize query by selecting only needed fields
+    latest_prices = (PriceData.objects
+    .filter(date=date)
+    .select_related('security')
+    .only('security__ticker', 'close_price', 'date')
+    .annotate(
+        previous_close=Subquery(
+            PriceData.objects
+            .filter(
+                security_id=OuterRef('security_id'),
+                date=previous_date
+            )
+            .values('close_price')[:1]
+        )
+    )
+    .annotate(
+        price_change=Case(
+            When(
+                previous_close__isnull=False,
+                previous_close__gt=0,
+                then=ExpressionWrapper(
+                    (F('close_price') - F('previous_close')) / F('previous_close') * 100,
+                    output_field=FloatField()
+                )
+            ),
+            default=Value(0.0),
+            output_field=FloatField(),
+        )
+    ))
+
+    # Cache for 5 minutes (adjust as needed)
+    cache.set(cache_key, latest_prices, 300)
+    return latest_prices
 
 
 def calculate_market_breadth(queryset):
@@ -148,143 +218,88 @@ def get_latest_trading_data(timeframe='D'):
     return latest_date, latest_prices, f"{timeframe_text} Change - {latest_date.strftime('%B %d, %Y')}"
 
 
+def calculate_market_stats(prices_queryset):
+    """Calculate market statistics with a single query."""
+    cache_key = f'market_stats_{prices_queryset.query.__str__()}'
+    cached_stats = cache.get(cache_key)
+
+    if cached_stats:
+        return cached_stats
+
+    stats = prices_queryset.aggregate(
+        gainers=Count(Case(When(price_change__gt=0, then=1))),
+        losers=Count(Case(When(price_change__lt=0, then=1))),
+        unchanged=Count(Case(When(price_change=0, then=1)))
+    )
+
+    total = sum(stats.values())
+
+    market_breadth = {
+        'gainers': stats['gainers'],
+        'losers': stats['losers'],
+        'unchanged': stats['unchanged'],
+        'gainers_percentage': (stats['gainers'] / total * 100) if total > 0 else 0,
+        'losers_percentage': (stats['losers'] / total * 100) if total > 0 else 0,
+        'unchanged_percentage': (stats['unchanged'] / total * 100) if total > 0 else 0
+    }
+
+    cache.set(cache_key, market_breadth, 300)
+    return market_breadth
+
+
 def index(request):
-    """
-    Homepage view showing market overview and interactive charts.
-    Supports different timeframes (Daily, Weekly, Monthly) for price changes.
-    """
     try:
-        # Get and validate the timeframe parameter
         timeframe = request.GET.get('timeframe', 'D')
         if timeframe not in ['D', 'W', 'M']:
             timeframe = 'D'
 
-        # Use only valid price data
-        valid_prices = PriceData.objects.valid()
+        # Get latest date from cache or database
+        latest_date_key = 'latest_trading_date'
+        latest_date = cache.get(latest_date_key)
 
-        # Get latest market data
-        latest_data = valid_prices.order_by('-date').select_related('security').first()
-        if not latest_data:
-            return render(request, 'fin_data_cl/index.html', {
-                'error': 'No valid price data available'
-            })
+        if not latest_date:
+            latest_data = PriceData.objects.valid().order_by('-date').first()
+            if not latest_data:
+                return render(request, 'index.html', {
+                    'error': 'No valid price data available'
+                })
+            latest_date = latest_data.date
+            cache.set(latest_date_key, latest_date, 300)
 
-        # Calculate reference dates for our timeframe
-        latest_date = latest_data.date
-        if timeframe == 'D':
-            prev_date = latest_date - timedelta(days=1)
-            period_text = "Daily"
-        elif timeframe == 'W':
-            prev_date = latest_date - timedelta(days=7)
-            period_text = "Weekly"
-        else:  # Monthly
-            prev_date = latest_date - timedelta(days=30)
-            period_text = "Monthly"
+        # Get price data with caching
+        latest_prices = get_cached_price_data(latest_date, timeframe)
 
-        # Get the most recent trading day not exceeding our target previous date
-        prev_date = (valid_prices
-                     .filter(date__lte=prev_date)
-                     .values('date')
-                     .order_by('-date')
-                     .first()['date'])
+        # Calculate market statistics
+        market_breadth = calculate_market_stats(latest_prices)
 
-        # Get current and previous prices with price change calculations
-        latest_prices = (valid_prices
-                         .filter(date=latest_date)
-                         .select_related('security')
-                         .annotate(
-                             previous_close=Subquery(
-                                 valid_prices
-                                 .filter(
-                                     security_id=OuterRef('security_id'),
-                                     date=prev_date
-                                 )
-                                 .values('close_price')[:1]
-                             )
-                         )
-                         .annotate(
-                             price_change=Case(
-                                 When(
-                                     previous_close__isnull=False,
-                                     previous_close__gt=0,
-                                     then=ExpressionWrapper(
-                                         (F('close_price') - F('previous_close')) / F('previous_close') * 100,
-                                         output_field=FloatField()
-                                     )
-                                 ),
-                                 default=Value(0.0),
-                                 output_field=FloatField(),
-                             )
-                         ))
+        # Get top movers efficiently
+        movers_cache_key = f'top_movers_{latest_date.isoformat()}_{timeframe}'
+        top_movers = cache.get(movers_cache_key)
 
-        # Calculate market breadth statistics
-        market_stats = latest_prices.aggregate(
-            gainers=Count(Case(When(price_change__gt=0, then=1))),
-            losers=Count(Case(When(price_change__lt=0, then=1))),
-            unchanged=Count(Case(When(price_change=0, then=1)))
-        )
+        if not top_movers:
+            gainers = latest_prices.order_by('-price_change')[:5]
+            losers = latest_prices.order_by('price_change')[:5]
 
-        # Calculate percentages for market breadth
-        total_securities = sum(market_stats.values())
-        market_breadth = {
-            'gainers': market_stats['gainers'],
-            'losers': market_stats['losers'],
-            'unchanged': market_stats['unchanged'],
-            'gainers_percentage': (market_stats['gainers'] / total_securities * 100) if total_securities > 0 else 0,
-            'losers_percentage': (market_stats['losers'] / total_securities * 100) if total_securities > 0 else 0,
-            'unchanged_percentage': (market_stats['unchanged'] / total_securities * 100) if total_securities > 0 else 0
-        }
-
-        # Get top gainers and losers
-        gainers = latest_prices.order_by('-price_change')[:5]
-        losers = latest_prices.order_by('price_change')[:5]
-
-        # Format movers data for display
-        def format_mover(record):
-            try:
-                return {
-                    'symbol': record.security.ticker,
-                    'change': f"{record.price_change:+.2f}%",
-                    'price': f"${record.close_price:.2f}"
-                }
-            except Exception:
-                return {
-                    'symbol': record.security.ticker,
-                    'change': "0.00%",
-                    'price': "$0.00"
-                }
-
-        # Standard analysis tools definition
-        analysis_tools = [
-            {
-                'name': 'Metric Plotter',
-                'description': 'Plot and compare key metrics',
-                'url': f"/metric_plotter/"
-            },
-            {
-                'name': 'Stock Screener',
-                'description': 'Filter stocks by key metrics',
-                'url': '/screener/'
-            },
-            {
-                'name': 'Financial Reports & Statements',
-                'description': 'Compare AI Summarized Reports for Companies and Quarters',
-                'url': f"/reports/"
-            },
-            {
-                'name': 'Financial Risks',
-                'description': 'Compare AI Summarized Risks and historical changes from Companies Reports',
-                'url': f"/risks/"
+            format_mover = lambda x: {
+                'symbol': x.security.ticker,
+                'change': f"{x.price_change:+.2f}%",
+                'price': f"${x.close_price:.2f}"
             }
-        ]
 
-        # Prepare context with all required data
+            top_movers = {
+                'gainers': [format_mover(g) for g in gainers],
+                'losers': [format_mover(l) for l in losers]
+            }
+            cache.set(movers_cache_key, top_movers, 300)
+
+        period_map = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly'}
+
         context = {
-            'formatted_date': f"{period_text} Change - {latest_date.strftime('%B %d, %Y')}",
+            'formatted_date': f"{period_map[timeframe]} Change - {latest_date.strftime('%B %d, %Y')}",
             'market_breadth': market_breadth,
-            'top_gainers': [format_mover(g) for g in gainers],
-            'bottom_performers': [format_mover(l) for l in losers],
-            'analysis_tools': analysis_tools,
+            'top_gainers': top_movers['gainers'],
+            'bottom_performers': top_movers['losers'],
+            'analysis_tools': get_analysis_tools(),
             'api_base_url': settings.API_BASE_URL,
             'current_timeframe': timeframe
         }

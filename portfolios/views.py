@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-
+from django.core.exceptions import ValidationError
 
 class PortfolioManagementView(LoginRequiredMixin, TemplateView):
     template_name = 'portfolios/management.html'
@@ -31,9 +31,13 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Portfolio.objects.filter(user=self.request.user)
 
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
     @transaction.atomic
     @action(detail=True, methods=['post'])
     def add_position(self, request, pk=None):
+        """Add a position to portfolio"""
         portfolio = self.get_object()
         serializer = PositionSerializer(data=request.data)
 
@@ -42,15 +46,46 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'])
-    def performance(self, request, pk=None):
-        portfolio = self.get_object()
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
+    @action(detail=True, methods=['post'])
+    def update_position(self, request, pk=None):
+        """Update existing position"""
+        try:
+            position = Position.objects.get(
+                id=request.data.get('position_id'),
+                portfolio__user=request.user
+            )
+            serializer = PositionSerializer(
+                position,
+                data=request.data,
+                partial=True
+            )
 
-        performance_data = portfolio.get_historical_performance(start_date, end_date)
-        return Response(performance_data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        except Position.DoesNotExist:
+            return Response(
+                {'detail': 'Position not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'])
+    def remove_position(self, request, pk=None):
+        """Remove position from portfolio"""
+        try:
+            position = Position.objects.get(
+                id=request.data.get('position_id'),
+                portfolio__user=request.user
+            )
+            position.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Position.DoesNotExist:
+            return Response(
+                {'detail': 'Position not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 @login_required
 @require_http_methods(["POST"])
 def create_portfolio(request):
