@@ -2,117 +2,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Enhanced meta tags for better mobile and SEO support -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="Financial Analysis Platform - Advanced stock analysis and financial data visualization">
     <meta name="theme-color" content="#1a237e">
+    <meta name="format-detection" content="telephone=no">
 
     <title>{% block title %}Financial Analysis Platform{% endblock %}</title>
 
-    <!-- Favicon -->
+    <!-- Preconnect to external domains for faster resource loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://code.jquery.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
+
+    <!-- Favicon setup for various platforms -->
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32x32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-16x16.png' %}">
-    <!-- CSS -->
+
+    <!-- External CSS resources -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
     <style>
+        /* Core design system variables - Maintaining existing color scheme while adding calculated variations */
         :root {
+            /* Primary colors */
             --primary-color: #1a237e;
             --secondary-color: #0d47a1;
+            --primary-light: #4a51a8;
+            --primary-dark: #121858;
+
+            /* Background colors */
             --bg-light: #f8f9fa;
+            --bg-white: #ffffff;
+
+            /* Text colors */
+            --text-primary: #212529;
             --text-muted: #6c757d;
-            --border-color: rgba(0,0,0,0.05);
+            --text-light: rgba(255, 255, 255, 0.9);
+
+            /* Border and shadow */
+            --border-color: rgba(0, 0, 0, 0.05);
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
+
+            /* Layout measurements */
+            --navbar-height: 3.5rem;
+            --content-padding: 1rem;
+            --container-padding: 1rem;
+            --border-radius: 0.5rem;
+            --button-height: 2.5rem;
+
+            /* Safe area insets for modern mobile devices */
+            --safe-area-inset-top: env(safe-area-inset-top, 0px);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-area-inset-left: env(safe-area-inset-left, 0px);
+            --safe-area-inset-right: env(safe-area-inset-right, 0px);
         }
 
+        /* Responsive adjustments for tablet and desktop */
+        @media (min-width: 768px) {
+            :root {
+                --content-padding: 1.5rem;
+                --container-padding: 1.5rem;
+                --button-height: 2.75rem;
+            }
+        }
+
+        /* Base layout and typography */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-color: var(--bg-light);
+            color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
+        /* Enhanced container responsiveness */
+        .container {
+            max-width: 1400px;
+            padding-left: calc(var(--container-padding) + var(--safe-area-inset-left));
+            padding-right: calc(var(--container-padding) + var(--safe-area-inset-right));
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Navigation styling with improved mobile support */
         .navbar {
-            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            min-height: var(--navbar-height);
+            padding: 0.5rem var(--container-padding);
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: var(--shadow-sm);
         }
 
         .navbar-brand {
-            color: white !important;
+            color: var(--bg-white) !important;
             font-weight: 600;
             font-size: 1.25rem;
+            padding: 0.5rem 0;
+            letter-spacing: -0.01em;
         }
 
+        .navbar-toggler {
+            border: none;
+            padding: 0.5rem;
+            color: var(--text-light);
+            transition: opacity 0.2s ease;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: none;
+            opacity: 0.8;
+        }
+
+        /* Navigation links with enhanced touch targets */
         .navbar-nav .nav-link {
-            color: rgba(255,255,255,0.9) !important;
+            color: var(--text-light) !important;
             font-weight: 500;
-            padding: 0.5rem 1rem;
-            transition: all 0.2s;
-            border-radius: 6px;
+            padding: 0.625rem 1rem;
+            border-radius: var(--border-radius);
+            transition: all 0.2s ease;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
         }
 
         .navbar-nav .nav-link:hover {
-            color: white !important;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .navbar-nav .nav-link.active {
-            color: white !important;
-            background: rgba(255,255,255,0.15);
+            background: rgba(255, 255, 255, 0.15);
+            font-weight: 600;
         }
 
-        .container {
-            max-width: 1400px;
-            padding: 0 1.5rem;
+        /* Enhanced mobile navigation */
+        @media (max-width: 991.98px) {
+            .navbar-collapse {
+                position: fixed;
+                top: var(--navbar-height);
+                left: 0;
+                right: 0;
+                background: var(--primary-color);
+                padding: 1rem;
+                max-height: calc(100vh - var(--navbar-height));
+                overflow-y: auto;
+                transition: all 0.3s ease-in-out;
+                transform: translateY(-100%);
+                opacity: 0;
+                visibility: hidden;
+            }
+
+            .navbar-collapse.show {
+                transform: translateY(0);
+                opacity: 1;
+                visibility: visible;
+            }
+
+            .navbar-nav {
+                padding-bottom: var(--safe-area-inset-bottom);
+            }
+
+            .nav-item {
+                margin: 0.25rem 0;
+            }
+
+            .navbar-nav .nav-link {
+                padding: 0.75rem 1rem;
+            }
         }
 
+        /* Card enhancements with conditional hover effects */
         .card {
             border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-            border-radius: 0.5rem;
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: var(--shadow-sm);
+            border-radius: var(--border-radius);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background: var(--bg-white);
         }
 
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        @media (hover: hover) {
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-md);
+            }
         }
 
+        /* Alert styling */
         .alert {
             border: none;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1rem;
         }
 
+        /* Button enhancements */
         .btn {
-            padding: 0.5rem 1rem;
+            min-height: var(--button-height);
+            padding: 0.5rem 1.25rem;
             font-weight: 500;
-            border-radius: 6px;
-            transition: all 0.2s;
+            border-radius: var(--border-radius);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .btn-primary {
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             border: none;
+            color: var(--text-light);
         }
 
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        @media (hover: hover) {
+            .btn-primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
         }
 
-        footer {
-            margin-top: auto;
-            padding: 1.5rem 0;
-            background: white;
-            border-top: 1px solid var(--border-color);
+        /* Main content area */
+        main {
+            flex: 1 0 auto;
+            padding: var(--content-padding) 0;
+            width: 100%;
         }
 
-        footer p {
-            color: var(--text-muted);
-            font-size: 0.875rem;
+        .container.my-4 {
+            margin-top: var(--content-padding) !important;
+            margin-bottom: var(--content-padding) !important;
+        }
+
+        /* Table enhancements */
+        .table {
+            margin-bottom: 1rem;
+            background-color: var(--bg-white);
+            border-radius: var(--border-radius);
+            overflow: hidden;
         }
 
         .table th {
@@ -120,99 +258,154 @@
             color: var(--text-muted);
             background-color: var(--bg-light);
             border-bottom: 1px solid var(--border-color);
+            padding: 1rem;
         }
 
         .table td {
+            padding: 1rem;
             border-color: var(--border-color);
+            vertical-align: middle;
         }
 
-        @media (max-width: 991.98px) {
-            .navbar-collapse {
-                background: rgba(255,255,255,0.05);
-                padding: 1rem;
-                border-radius: 0.5rem;
+        /* Responsive table handling */
+        @media (max-width: 767.98px) {
+            .table-responsive {
+                border-radius: var(--border-radius);
+                box-shadow: var(--shadow-sm);
+            }
+        }
+
+        /* Footer styling */
+        footer {
+            margin-top: auto;
+            padding: var(--content-padding) 0;
+            background: var(--bg-white);
+            border-top: 1px solid var(--border-color);
+        }
+
+        footer p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        footer a:hover {
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 767.98px) {
+            footer .row > div {
+                text-align: center !important;
+                margin-bottom: 0.5rem;
+            }
+
+            footer .text-md-end {
                 margin-top: 1rem;
             }
+        }
+
+        /* Loading state styles */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        /* Focus styles for accessibility */
+        :focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
         }
     </style>
 
     {% block extra_css %}{% endblock %}
 
-    <!-- Base Scripts -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Deferred loading of non-critical scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" defer></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js" defer></script>
 
     <!-- CSRF Token for AJAX -->
     <script>
         const CSRF_TOKEN = '{{ csrf_token }}';
     </script>
 </head>
+
 <body>
+    <!-- Navigation -->
     <nav class="navbar navbar-expand-lg">
         <div class="container">
+            <!-- Brand -->
             <a class="navbar-brand d-flex align-items-center" href="{% url 'fin_data:index' %}">
                 Finriv
             </a>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+            <!-- Mobile toggle button -->
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav" aria-controls="navbarNav"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon d-flex align-items-center justify-content-center"></span>
             </button>
 
+            <!-- Navigation items -->
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto gap-2">
-                        {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'users:logout' %}">
-                            <i class="bi bi-box-arrow-right me-1"></i> Logout
-                        </a>
-                    </li>
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'users:logout' %}">
+                                <i class="bi bi-box-arrow-right me-2"></i> Logout
+                            </a>
+                        </li>
                     {% else %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'users:login' %}">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Login
+                                <i class="bi bi-box-arrow-in-right me-2"></i> Login
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'users:signup' %}">
-                                <i class="bi bi-person-plus me-1"></i> Sign Up
+                                <i class="bi bi-person-plus me-2"></i> Sign Up
                             </a>
                         </li>
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'metrics:metric_plotter' %}active{% endif %}"
                            href="{% url 'fin_data:metric_plotter' %}">
-                           <i class="bi bi-graph-up me-1"></i> Metrics
+                           <i class="bi bi-graph-up me-2"></i> Metrics
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:screener' %}active{% endif %}"
                            href="{% url 'fin_data:screener' %}">
-                           <i class="bi bi-funnel me-1"></i> Screener
+                           <i class="bi bi-funnel me-2"></i> Screener
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:financial_reports' %}active{% endif %}"
                            href="{% url 'fin_data:reports' %}">
-                           <i class="bi bi-file-earmark-text me-1"></i> Reports
+                           <i class="bi bi-file-earmark-text me-2"></i> Reports
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:financial_risks' %}active{% endif %}"
                            href="{% url 'fin_data:risks' %}">
-                           <i class="bi bi-shield-check me-1"></i> Risks
+                           <i class="bi bi-shield-check me-2"></i> Risks
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:about' %}active{% endif %}"
                            href="{% url 'about' %}">
-                           <i class="bi bi-info-circle me-1"></i> About
+                           <i class="bi bi-info-circle me-2"></i> About
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:contact' %}active{% endif %}"
                            href="{% url 'contacts:contact-page' %}">
-                           <i class="bi bi-envelope me-1"></i> Contact
+                           <i class="bi bi-envelope me-2"></i> Contact
                         </a>
                     </li>
                 </ul>
@@ -220,6 +413,7 @@
         </div>
     </nav>
 
+    <!-- Flash Messages -->
     {% if messages %}
     <div class="container mt-4">
         {% for message in messages %}
@@ -231,6 +425,7 @@
     </div>
     {% endif %}
 
+    <!-- Main Content Area -->
     <main class="flex-grow-1">
         <div class="container my-4">
             {% block content %}
@@ -238,50 +433,72 @@
         </div>
     </main>
 
-<footer>
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-6 text-center text-md-start">
-                <p class="mb-0">&copy; {% now "Y" %} Finriv. All rights reserved.</p>
-            </div>
-            <div class="col-md-6 text-center text-md-end">
-                <p class="mb-0">
-                    <a href="{% url 'about' %}" class="text-decoration-none text-muted me-3">About</a>
-                    <a href="{% url 'contacts:contact-page' %}" class="text-decoration-none text-muted me-3">Contact</a>
-                    <a href="{% url 'users:privacy' %}" class="text-decoration-none text-muted me-3">Privacy</a>
-                    <a href="{% url 'users:terms' %}" class="text-decoration-none text-muted">Terms</a>
-                </p>
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start">
+                    <p>&copy; {% now "Y" %} Finriv. All rights reserved.</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <p>
+                        <a href="{% url 'about' %}" class="me-3">About</a>
+                        <a href="{% url 'contacts:contact-page' %}" class="me-3">Contact</a>
+                        <a href="{% url 'users:privacy' %}" class="me-3">Privacy</a>
+                        <a href="{% url 'users:terms' %}">Terms</a>
+                    </p>
+                </div>
             </div>
         </div>
-    </div>
-</footer>
+    </footer>
 
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Core Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
 
-    <!-- Common JavaScript -->
+    <!-- Enhanced AJAX Setup -->
     <script>
-        $.ajaxSetup({
-            beforeSend: function(xhr, settings) {
-                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                    xhr.setRequestHeader("X-CSRFToken", CSRF_TOKEN);
+        document.addEventListener('DOMContentLoaded', function() {
+            // AJAX Setup
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                        xhr.setRequestHeader("X-CSRFToken", CSRF_TOKEN);
+                    }
                 }
-            }
-        });
+            });
 
-        function handleAjaxError(xhr, status, error) {
-            console.error('Ajax Error:', status, error);
-            let errorMessage = 'An error occurred. Please try again.';
-            if (xhr.responseJSON && xhr.responseJSON.error) {
-                errorMessage = xhr.responseJSON.error;
-            }
-            // Show error in a toast or alert
-            alert(errorMessage);
-        }
+            // Enhanced error handling
+            $(document).ajaxError(function(event, xhr, settings, error) {
+                console.error('Ajax Error:', error);
+                let errorMessage = 'An error occurred. Please try again.';
+
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                } else if (xhr.status === 404) {
+                    errorMessage = 'The requested resource was not found.';
+                } else if (xhr.status === 403) {
+                    errorMessage = 'You do not have permission to perform this action.';
+                } else if (xhr.status === 500) {
+                    errorMessage = 'A server error occurred. Please try again later.';
+                }
+
+                // Show error in alert (could be enhanced with a toast system)
+                alert(errorMessage);
+            });
+
+            // Add loading state handler
+            $(document).on({
+                ajaxStart: function() {
+                    $('body').addClass('loading');
+                },
+                ajaxStop: function() {
+                    $('body').removeClass('loading');
+                }
+            });
+        });
     </script>
 
     {% block extra_js %}{% endblock %}
 </body>
-
 </html>
