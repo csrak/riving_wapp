@@ -211,7 +211,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.view_name == 'fin_data:contact' %}active{% endif %}"
-                           href="{% url 'contact' %}">
+                           href="{% url 'contacts:contact-page' %}">
                            <i class="bi bi-envelope me-1"></i> Contact
                         </a>
                     </li>
@@ -247,7 +247,7 @@
             <div class="col-md-6 text-center text-md-end">
                 <p class="mb-0">
                     <a href="{% url 'about' %}" class="text-decoration-none text-muted me-3">About</a>
-                    <a href="{% url 'contact' %}" class="text-decoration-none text-muted me-3">Contact</a>
+                    <a href="{% url 'contacts:contact-page' %}" class="text-decoration-none text-muted me-3">Contact</a>
                     <a href="{% url 'users:privacy' %}" class="text-decoration-none text-muted me-3">Privacy</a>
                     <a href="{% url 'users:terms' %}" class="text-decoration-none text-muted">Terms</a>
                 </p>

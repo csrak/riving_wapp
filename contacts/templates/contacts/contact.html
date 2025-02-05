@@ -1,0 +1,172 @@
+{% extends 'fin_data_cl/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Contact - Finriv" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .contact-container {
+        padding: 2rem 0;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .form-control {
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        transition: border-color 0.3s ease;
+    }
+    .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+    }
+    .btn-submit {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .alert {
+        display: none;
+        margin-top: 1rem;
+    }
+    .spinner-border {
+        width: 1.2rem;
+        height: 1.2rem;
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container contact-container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h1 class="text-center mb-4">{% trans "Contact Us" %}</h1>
+
+            <div class="alert alert-success" id="successAlert" role="alert"></div>
+            <div class="alert alert-danger" id="errorAlert" role="alert"></div>
+
+            <form id="contactForm" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="name" class="form-label">{% trans "Your Name" %}</label>
+                    <input type="text" class="form-control" id="name" required
+                           minlength="2" maxlength="100">
+                    <div class="invalid-feedback">
+                        {% trans "Please enter your name (at least 2 characters)" %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="email" class="form-label">{% trans "Your Email" %}</label>
+                    <input type="email" class="form-control" id="email" required>
+                    <div class="invalid-feedback">
+                        {% trans "Please enter a valid email address" %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="message" class="form-label">{% trans "Your Message" %}</label>
+                    <textarea class="form-control" id="message" rows="5" required
+                              minlength="10" maxlength="2000"></textarea>
+                    <div class="invalid-feedback">
+                        {% trans "Please enter your message (at least 10 characters)" %}
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" class="btn btn-submit" id="submitButton">
+                        {% trans "Send Message" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('contactForm');
+    const submitButton = document.getElementById('submitButton');
+    const successAlert = document.getElementById('successAlert');
+    const errorAlert = document.getElementById('errorAlert');
+
+    // Add validation styles on input
+    form.querySelectorAll('.form-control').forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.checkValidity()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    });
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Hide existing alerts
+        successAlert.style.display = 'none';
+        errorAlert.style.display = 'none';
+
+        // Form validation
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Disable submit button and show loading state
+        submitButton.disabled = true;
+        const originalButtonText = submitButton.innerHTML;
+        submitButton.innerHTML = '<span class="spinner-border" role="status" aria-hidden="true"></span>{% trans "Sending..." %}';
+
+        try {
+            const response = await fetch('{% url "contacts:contact-api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    name: document.getElementById('name').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    message: document.getElementById('message').value.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                successAlert.textContent = data.message;
+                successAlert.style.display = 'block';
+                form.reset();
+                form.classList.remove('was-validated');
+                form.querySelectorAll('.form-control').forEach(input => {
+                    input.classList.remove('is-valid');
+                });
+            } else {
+                errorAlert.textContent = data.message;
+                errorAlert.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorAlert.textContent = '{% trans "An error occurred. Please try again later." %}';
+            errorAlert.style.display = 'block';
+        } finally {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    });
+});
+</script>
+{% endblock %}

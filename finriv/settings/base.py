@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     'django.contrib.staticfiles',
+    'contacts',
     'django_extensions',
     'management_commands',
     'rest_framework',
@@ -132,3 +133,5 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'apikey'
 DEFAULT_FROM_EMAIL = 'finriv.app@gmail.com'  # Your verified Gmail
+
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'your.actual@email.com')
