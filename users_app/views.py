@@ -17,6 +17,9 @@ from .models import UserProfile
 from .tokens import email_confirmation_token
 from django.utils.encoding import force_str, force_bytes
 import logging
+from django import forms
+from django.shortcuts import render, redirect
+from .models import UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ class CustomLoginView(LoginView):
     template_name = 'users_app/login.html'
     redirect_authenticated_user = True
     next_page = '/'  # or any other URL name like 'fin_data:index'
+
     def form_invalid(self, form):
         messages.error(self.request, 'Invalid username or password')
         return super().form_invalid(form)
@@ -120,3 +124,26 @@ def privacy_policy(request):
 
 def terms(request):
     return render(request, 'users_app/terms.html')
+
+
+from django.contrib.auth.decorators import login_required
+
+
+class ProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['phone_number']
+
+
+@login_required
+def profile(request):
+    if request.method == 'POST':
+        form = ProfileUpdateForm(request.POST, instance=request.user.userprofile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully!')
+            return redirect('users:profile')
+    else:
+        form = ProfileUpdateForm(instance=request.user.userprofile)
+
+    return render(request, 'users_app/profile.html', {'form': form})

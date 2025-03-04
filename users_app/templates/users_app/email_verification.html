@@ -11,13 +11,13 @@
     <p>Hi {{ user.username }},</p>
     <p>Thank you for signing up. Please verify your email address to activate your account.</p>
     <p>
-        <a href="http://{{ domain }}{% url 'users:activate' uidb64=uid token=token %}"
+        <a href="https://{{ domain }}{% url 'users:activate' uidb64=uid token=token %}"
            style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px;">
-            Verify Email
-        </a>
-    </p>
+        Verify Email
+    </a>
+
     <p>If the button doesn't work, copy and paste this link:</p>
-    <p>http://{{ domain }}{% url 'users:activate' uidb64=uid token=token %}</p>
+    <p>https://{{ domain }}{% url 'users:activate' uidb64=uid token=token %}</p>
     <p>This link will expire in 24 hours.</p>
     <p>Best regards,<br>The FinRiv Team</p>
 </body>
