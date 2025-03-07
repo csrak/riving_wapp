@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 import logging
 import sys
+import requests
 from pprint import pformat
 
 # Create a logger for diagnostics
@@ -14,6 +15,8 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+session = requests.Session()
+session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
 
 class YahooFinanceDiagnostics(unittest.TestCase):
     """Tests to diagnose issues with Yahoo Finance data retrieval"""
@@ -88,7 +91,7 @@ class YahooFinanceDiagnostics(unittest.TestCase):
 
         try:
             # Create ticker object
-            ticker = yf.Ticker(ticker_symbol)
+            ticker = yf.Ticker(ticker_symbol, session = session)
 
             # Check ticker info
             logger.info("Retrieving ticker info...")
