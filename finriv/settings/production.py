@@ -71,3 +71,5 @@ EMAIL_HOST_PASSWORD = config('SENDGRID_KEY', default=None)
 SENDGRID_API_KEY = config('SENDGRID_KEY', default=None)
 EMAIL_HOST_PASSWORD = config('SENDGRID_KEY', default="None")  # Your API key
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'your-email@example.com')  # Add this new setting
+
+GOOGLE_ANALYTICS_ID = config('GOOGLE_ANALYTICS', default=None)

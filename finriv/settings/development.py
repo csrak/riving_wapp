@@ -63,3 +63,4 @@ LOGGING = {
         },
     },
 }
+GOOGLE_ANALYTICS_ID = ''

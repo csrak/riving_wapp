@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Subquery, OuterRef
 from django.core.cache import cache
 from functools import lru_cache
+import hashlib
 @lru_cache(maxsize=1)
 def get_analysis_tools():
     return [
@@ -220,7 +221,8 @@ def get_latest_trading_data(timeframe='D'):
 
 def calculate_market_stats(prices_queryset):
     """Calculate market statistics with a single query."""
-    cache_key = f'market_stats_{prices_queryset.query.__str__()}'
+    query_str = str(prices_queryset.query)
+    cache_key = 'market_stats_' + hashlib.md5(query_str.encode('utf-8')).hexdigest()
     cached_stats = cache.get(cache_key)
 
     if cached_stats:
