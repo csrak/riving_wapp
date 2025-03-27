@@ -21,11 +21,14 @@ def reset_django_q_database():
 
         logger.info("Successfully cleared all Django-Q schedules and tasks")
 
-        # Create a fresh price update schedule
+        # Create a fresh price update schedule - key changes are in the kwargs formatting
         Schedule.objects.create(
             name='Daily SCL Price Update',
             func='fin_data_cl.tasks.update_price_data',
-            kwargs='{"exchange": "SCL"}',  # Make sure this is a string, not a dict
+            # Using args instead of kwargs to avoid serialization issues
+            args='("SCL",)',
+            # Leave kwargs empty to avoid serialization problems
+            kwargs='{}',
             schedule_type=Schedule.DAILY,
             repeats=-1,
             next_run=timezone.now() + timezone.timedelta(minutes=10)
