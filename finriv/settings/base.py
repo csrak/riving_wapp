@@ -89,10 +89,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 Q_CLUSTER = {
     'name': 'DjangoQ',
-    'workers': 4,
-    'timeout': 60,
-    'retry': 120,
+    'workers': 2,  # Adjust number of workers as needed
+    'recycle': 500,  # Recycle workers after this many tasks
+    'timeout': 60,  # Task timeout in seconds
+    'retry': 120,  # Retry failed tasks after this many seconds
+    'catch_up': False,  # Don't execute missed schedules
     'orm': 'default',  # Use Django ORM as the broker
+    'sync': False,  # Set to True for development/debugging
+    'max_attempts': 3  # Maximum retry attempts for failed tasks
 }
 
 # settings.py
@@ -136,3 +140,4 @@ EMAIL_HOST_USER = 'apikey'
 DEFAULT_FROM_EMAIL = 'finriv.app@gmail.com'  # Your verified Gmail
 
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'your.actual@email.com')
+
