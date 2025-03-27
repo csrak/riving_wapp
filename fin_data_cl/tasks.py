@@ -149,3 +149,17 @@
 # def update_prices_and_calculate_ratios():
 #     update_stock_prices()
 #     calculate_ratios()
+# fin_data_cl/tasks.py (create this file if it doesn't exist)
+
+from django.core.management import call_command
+
+def update_price_data(exchange='SCL'):
+    """
+    Run the price update command for the specified exchange.
+    This function is designed to be called by Django-Q.
+    """
+    try:
+        call_command('price_update', exchange=exchange)
+        return f"Successfully updated prices for {exchange}"
+    except Exception as e:
+        return f"Error updating prices for {exchange}: {str(e)}"
